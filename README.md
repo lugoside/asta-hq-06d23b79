@@ -1,6 +1,14 @@
 # FantaAsta Assistant
 
-Assistente **live** per l'asta del fantacalcio (Classic). Durante l'asta inserisci chi viene comprato e a quanto; l'app ricalcola in tempo reale il **prezzo consigliato** per ogni giocatore chiamato, tenendo conto di inflazione, scarsità di ruolo e del tuo budget residuo.
+**App online:** https://lugoside.github.io/fantaasta/
+
+Assistente **live** per l'asta del fantacalcio (Classic).
+
+## Installazione sul telefono (Android)
+
+1. Apri https://lugoside.github.io/fantaasta/ con **Chrome**.
+2. Menu ⋮ → **«Installa app»** (o «Aggiungi a schermata Home»).
+3. Parte a tutto schermo come un'app; lo stato dell'asta resta salvato sul telefono. Durante l'asta inserisci chi viene comprato e a quanto; l'app ricalcola in tempo reale il **prezzo consigliato** per ogni giocatore chiamato, tenendo conto di inflazione, scarsità di ruolo e del tuo budget residuo.
 
 - **Lega**: 10 squadre × 500 crediti (montepremi 5000). Rosa 3-8-8-6 (25 giocatori).
 - **Asta**: 3 settembre 2026 — stagione 2026/27.
