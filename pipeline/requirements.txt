@@ -1,0 +1,2 @@
+# La pipeline usa solo la libreria standard di Python (urllib, gzip, json, re).
+# Nessuna dipendenza esterna necessaria.

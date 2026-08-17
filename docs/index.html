@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>FantaAsta Assistant</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Fanta<span>Asta</span></h1>
+    <div class="data-chip" id="dataChip">…</div>
+  </header>
+
+  <!-- barra budget (solo schermata asta) -->
+  <div class="budget-bar" id="budgetBar">
+    <div>
+      <div class="big" id="myBudget">500</div>
+      <div class="lbl">crediti</div>
+    </div>
+    <div class="slots" id="mySlots"></div>
+  </div>
+
+  <main>
+    <!-- ============ ASTA ============ -->
+    <section class="screen active" id="screen-asta">
+      <div class="search-wrap">
+        <input id="search" type="text" inputmode="search" autocomplete="off"
+               placeholder="🔍 Cerca il giocatore chiamato…" />
+        <div class="results" id="searchResults"></div>
+      </div>
+
+      <div class="called empty" id="calledCard">
+        Cerca un giocatore per vedere il prezzo consigliato.
+      </div>
+
+      <div class="section-title">Ultimi acquisti</div>
+      <div class="list" id="recentList"><div class="row"><span class="meta">Nessun acquisto ancora.</span></div></div>
+    </section>
+
+    <!-- ============ LISTONE ============ -->
+    <section class="screen" id="screen-listone">
+      <div class="search-wrap">
+        <input id="searchL" type="text" inputmode="search" autocomplete="off" placeholder="🔍 Filtra per nome…" />
+      </div>
+      <div class="filters" id="roleFilters">
+        <button class="chip on" data-role="ALL">Tutti</button>
+        <button class="chip" data-role="P">P</button>
+        <button class="chip" data-role="D">D</button>
+        <button class="chip" data-role="C">C</button>
+        <button class="chip" data-role="A">A</button>
+        <select class="mini-select" id="sortBy">
+          <option value="consigliato">↕ Prezzo consigliato</option>
+          <option value="valore">↕ Valore</option>
+          <option value="qi">↕ Quotazione</option>
+          <option value="nome">↕ Nome</option>
+        </select>
+        <button class="chip" id="onlyFav">☆ Obiettivi</button>
+        <button class="chip" id="hideTaken">Nascondi presi</button>
+      </div>
+      <div class="list" id="listoneList"></div>
+    </section>
+
+    <!-- ============ SQUADRE ============ -->
+    <section class="screen" id="screen-squadre">
+      <div class="section-title">Budget e slot per squadra</div>
+      <div class="list" id="teamsList"></div>
+    </section>
+
+    <!-- ============ IMPOSTAZIONI ============ -->
+    <section class="screen" id="screen-impostazioni">
+      <div class="section-title">Dati</div>
+      <div class="setting">
+        <div class="hint" id="metaInfo"></div>
+        <button class="btn me full" id="refreshData">🔄 Aggiorna dati</button>
+        <div class="hint" style="margin-top:8px">Per aggiornare il listone prima dell'asta: GitHub → Actions → «update-data» → Run workflow, poi tocca qui.</div>
+      </div>
+
+      <div class="section-title">Ripartizione budget per ruolo</div>
+      <div id="splitSettings"></div>
+      <div class="hint" id="splitSum"></div>
+
+      <div class="section-title">La mia squadra</div>
+      <div class="setting">
+        <label>Nome</label>
+        <input id="myName" type="text" placeholder="IO" />
+      </div>
+
+      <div class="section-title">Avversari</div>
+      <div id="oppSettings"></div>
+
+      <div class="section-title">Azioni</div>
+      <div class="row-2">
+        <button class="btn ghost" id="exportBtn">⬇ Esporta backup</button>
+        <button class="btn ghost" id="importBtn">⬆ Importa backup</button>
+      </div>
+      <button class="btn danger full" id="resetBtn" style="margin-top:10px">🗑 Reset asta</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none" />
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs">
+    <button class="on" data-screen="asta"><span class="ic">⚡</span>Asta</button>
+    <button data-screen="listone"><span class="ic">📋</span>Listone</button>
+    <button data-screen="squadre"><span class="ic">👥</span>Squadre</button>
+    <button data-screen="impostazioni"><span class="ic">⚙️</span>Setup</button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

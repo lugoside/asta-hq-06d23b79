@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# dati grezzi scaricati (il JSON normalizzato in docs/data/ va invece committato)
+pipeline/.cache/
+pipeline/raw/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+*.log
