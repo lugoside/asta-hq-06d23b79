@@ -127,18 +127,29 @@ export function computeState(players, purchases, config = DEFAULT_CONFIG) {
 // Poi rinormalizzo così che la somma dei residui = crediti totali ancora liberi.
 // ---------------------------------------------------------------------------
 export function remainingPoolByRole(state, config = DEFAULT_CONFIG) {
-  const { totalBudget } = leagueTotals(config);
-  const remainingMoney = totalBudget - state.spentTotal;
-  const raw = {};
-  for (const r of ROLES) {
-    const target = totalBudget * config.budgetSplit[r];
-    raw[r] = Math.max(0, target - state.spentByRole[r]);
-  }
-  const rawSum = sum(ROLES.map((r) => raw[r]));
-  const pool = {};
-  for (const r of ROLES) {
-    pool[r] = rawSum > 0 ? (raw[r] / rawSum) * remainingMoney : 0;
-  }
+  // Modello di DOMANDA: i crediti ancora destinati a un ruolo sono la somma,
+  // su tutte le squadre, del loro budget residuo distribuito sui ruoli che
+  // devono ancora riempire. Peso di un ruolo per una squadra:
+  //   budgetSplit[r] * (slot di r ancora liberi / slot totali di r)
+  // Così il prezzo cala se gli altri hanno già riempito quel ruolo o hanno
+  // pochi crediti; all'inizio coincide con la ripartizione impostata.
+  const pool = { P: 0, D: 0, C: 0, A: 0 };
+  const addTeam = (budgetLeft, slotsRemaining) => {
+    if (budgetLeft <= 0) return;
+    const w = {};
+    let wsum = 0;
+    for (const r of ROLES) {
+      w[r] = config.budgetSplit[r] * (slotsRemaining[r] / (config.roster[r] || 1));
+      wsum += w[r];
+    }
+    if (wsum <= 0) return; // squadra con rosa completa: budget fuori dal mercato
+    for (const r of ROLES) pool[r] += budgetLeft * (w[r] / wsum);
+  };
+  // squadre che hanno già comprato (budget/slot aggiornati)
+  for (const t of state.teams) addTeam(t.budgetLeft, t.slotsRemaining);
+  // squadre non ancora "viste" (nessun acquisto): budget pieno, rosa piena
+  const emptyTeams = Math.max(0, config.numTeams - state.teams.length);
+  for (let i = 0; i < emptyTeams; i++) addTeam(config.budgetPerTeam, config.roster);
   return pool;
 }
 

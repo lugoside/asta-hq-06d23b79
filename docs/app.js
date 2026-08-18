@@ -269,13 +269,10 @@ function renderAsta() {
     card.textContent = "Cerca un giocatore per vedere il prezzo consigliato.";
   } else {
     card.className = "called";
-    const semTxt = {
-      verde: "🟢 Occasione — alla tua portata",
-      giallo: "🟡 Prezzo di mercato equo",
-      rosso: !p.needRole ? "🔴 Ruolo già completo per te" : "🔴 Oltre il tuo budget utile",
-      preso: `✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}`,
-    }[p.semaforo];
-    const semClass = p.semaforo === "preso" ? "giallo" : p.semaforo;
+    const offer = buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato);
+    let semClass, semTxt;
+    if (p.taken) { semClass = "giallo"; semTxt = `✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}`; }
+    else { const v = offerVerdict(p, offer); semClass = v.cls; semTxt = v.txt; }
     card.innerHTML = `
       <div class="top">
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
@@ -290,7 +287,7 @@ function renderAsta() {
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
         <div class="box"><div class="v">${BOARD.me.maxBid}</div><div class="l">tuo max</div></div>
       </div>
-      <div class="semaforo ${semClass}"><span class="dot"></span>${semTxt}</div>
+      <div class="semaforo ${semClass}" id="offerSem"><span class="dot"></span>${semTxt}</div>
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">
         <button class="step" data-step="-1">−</button>
@@ -301,6 +298,26 @@ function renderAsta() {
     `;
   }
   renderRecent();
+}
+
+// Verdetto (semaforo) basato sull'OFFERTA che stai considerando, non solo sul consigliato.
+function offerVerdict(p, offer) {
+  const tuoMax = BOARD.me ? BOARD.me.maxBid : Infinity;
+  if (!p.needRole) return { cls: "rosso", txt: "🔴 Ruolo già completo per te" };
+  if (offer > tuoMax) return { cls: "rosso", txt: `🔴 Non puoi: oltre il tuo max (${tuoMax})` };
+  if (offer > p.prezzoMax) return { cls: "rosso", txt: `🔴 Troppo caro (consigliato ${p.prezzoConsigliato})` };
+  if (offer > p.prezzoConsigliato) return { cls: "giallo", txt: `🟡 Strappo ok (consigliato ${p.prezzoConsigliato})` };
+  return { cls: "verde", txt: `🟢 Buon prezzo (≤ ${p.prezzoConsigliato})` };
+}
+// aggiorna il semaforo dal vivo mentre modifichi l'offerta, senza ridisegnare tutta la card
+function updateOfferSem() {
+  const el = document.getElementById("offerSem"); if (!el) return;
+  const p = selectedId ? boardPlayer(selectedId) : null; if (!p || p.taken) return;
+  const inp = document.getElementById("priceInput");
+  const offer = Math.max(1, Math.round(Number(inp?.value) || p.prezzoConsigliato));
+  const v = offerVerdict(p, offer);
+  el.className = `semaforo ${v.cls}`;
+  el.innerHTML = `<span class="dot"></span>${v.txt}`;
 }
 
 // Area azioni di acquisto: cambia in base allo stato del flusso (idle/chooseOpp/confirm)
@@ -624,6 +641,14 @@ function wire() {
       </div>`).join("");
   });
 
+  // aggiorna il semaforo mentre digiti l'offerta
+  document.body.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "priceInput") {
+      buyFlow.price = Math.max(1, Math.round(Number(e.target.value) || 1));
+      updateOfferSem();
+    }
+  });
+
   // click delega su tutta la pagina
   document.body.addEventListener("click", (e) => {
     if (justDragged) return; // ignora il click sintetico dopo un trascinamento
@@ -634,7 +659,7 @@ function wire() {
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
     const step = e.target.closest("[data-step]");
-    if (step) { const inp = document.getElementById("priceInput"); const v = Math.max(1, (Number(inp.value) || 1) + Number(step.dataset.step)); inp.value = v; buyFlow.price = v; return; }
+    if (step) { const inp = document.getElementById("priceInput"); const v = Math.max(1, (Number(inp.value) || 1) + Number(step.dataset.step)); inp.value = v; buyFlow.price = v; updateOfferSem(); return; }
     const buy = e.target.closest("[data-buy]");
     if (buy) { recordPurchase(MY_TEAM); return; }
     const flow = e.target.closest("[data-flow]");
