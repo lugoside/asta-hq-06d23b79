@@ -144,8 +144,10 @@ RANK_STATUS = {"titolare": 3, "ballottaggio": 2, "riserva": 1}
 # quanto lo stato-formazione incide sul valore (e quindi sul prezzo consigliato)
 FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
 # boost per il rigorista designato (rank 1 = titolare dei rigori) e per i battitori di punizione
+# rigore (gol, alta frequenza) > punizione (gol, rara) > corner (assist)
 FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
-FATTORE_PUNIZIONE = {1: 1.03}
+FATTORE_PUNIZIONE = {1: 1.04}
+FATTORE_CORNER = {1: 1.02}
 
 
 def annota_formazioni(players: list[dict]) -> int:
@@ -185,31 +187,37 @@ def annota_formazioni(players: list[dict]) -> int:
     return n
 
 
-def annota_rigoristi(players: list[dict]) -> int:
-    """Marca i rigoristi (rank 1 = principale) leggendo raw/rigoristi.json,
-    match per (squadra, token del nome). Tiene il rank migliore (più basso).
-    """
-    path = os.path.join(HERE, "raw", "rigoristi.json")
+def _annota_specialisti(players: list[dict], filename: str, field: str, tipo_map=None) -> None:
+    """Marca specialisti (rigoristi/punizioni/corner) leggendo raw/<filename>,
+    match per (squadra, token del nome). `field` è il campo di default; se le voci
+    hanno 'tipo', usa tipo_map per scegliere il campo. Tiene il rank migliore."""
+    path = os.path.join(HERE, "raw", filename)
     if not os.path.exists(path):
-        return 0
+        return
     with open(path, encoding="utf-8") as f:
-        rig = json.load(f)
+        items = json.load(f)
     by_team = {}
     for p in players:
         by_team.setdefault(_deacc(p["squadra"]), []).append(p)
-    n = 0
-    for it in rig:
+    for it in items:
         tokens = [t for t in _deacc(it["nome"]).split(" ") if t]
+        if not tokens:
+            continue
         cands = [p for p in by_team.get(_deacc(it["squadra"]), []) if set(tokens) <= set(_deacc(p["nome"]).split(" "))]
         if not cands:
             continue
         p = max(cands, key=lambda x: x.get("qi", 0))
-        field = "punizioneRank" if it.get("tipo") == "punizione" else "rigoreRank"
-        if field not in p or it["rank"] < p[field]:
-            if field not in p:
-                n += 1
-            p[field] = it["rank"]
-    return n
+        f = tipo_map.get(it.get("tipo"), field) if tipo_map else field
+        if f not in p or it["rank"] < p[f]:
+            p[f] = it["rank"]
+
+
+def annota_rigoristi(players: list[dict]) -> None:
+    # rigoristi.json contiene voci tipo rigore|punizione (Gazzetta)
+    _annota_specialisti(players, "rigoristi.json", "rigoreRank",
+                        tipo_map={"rigore": "rigoreRank", "punizione": "punizioneRank"})
+    # corner.json (SOSFanta)
+    _annota_specialisti(players, "corner.json", "cornerRank")
 
 
 def carica_raw() -> list[dict] | None:
@@ -269,7 +277,8 @@ def main():
     # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
     n_infortunati = annota_infortunati(players) if is_reale else 0
     n_formazioni = annota_formazioni(players) if is_reale else 0
-    n_rigoristi = annota_rigoristi(players) if is_reale else 0
+    if is_reale:
+        annota_rigoristi(players)  # rigori + punizioni + corner
     # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
     for p in players:
         f = FATTORE_FORMAZIONE.get(p.get("formazione"))
@@ -281,6 +290,9 @@ def main():
         pb = FATTORE_PUNIZIONE.get(p.get("punizioneRank"))
         if pb:
             p["valoreBase"] = round(p["valoreBase"] * pb, 2)
+        cb = FATTORE_CORNER.get(p.get("cornerRank"))
+        if cb:
+            p["valoreBase"] = round(p["valoreBase"] * cb, 2)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
@@ -304,6 +316,7 @@ def main():
         "numFormazioni": n_formazioni,
         "numRigoristi": sum(1 for p in players if p.get("rigoreRank")),
         "numPunizioni": sum(1 for p in players if p.get("punizioneRank")),
+        "numCorner": sum(1 for p in players if p.get("cornerRank")),
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",

@@ -25,6 +25,8 @@ FORMAZIONI_URL = "https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-se
 FORMAZIONI_SOS_URL = "https://www.sosfanta.com/asta-fantacalcio/seriea-tutte-formazioni-tipo-fantacalcio-2026-2027-asta-consigli-chi-prendere/?refresh_ce"
 # Gazzetta: per ogni squadra 'Calci di rigore: ...' e 'Calci di punizione: ...' (ordinati)
 RIGORISTI_URL = "https://www.gazzetta.it/calcio/fantanews/strumenti-fantacalcio/rigoristi/17-08-2026/rigoristi-serie-a-fantacalcio-tiratori-calci-da-fermo-punizioni.shtml"
+# SOSFanta: battitori di corner (assist) — Gazzetta non li ha
+CORNER_URL = "https://www.sosfanta.com/asta-fantacalcio/serie-a-2026-2027-tiratori-punizioni-corner-specialisti-fantacalcio-asta/"
 # DAZN copre tutte e 20 le squadre; SOSFanta resta come fallback (vuoto = disattivo)
 NEOPROMOSSE = []
 SQUADRE_SERIEA = [
@@ -191,6 +193,29 @@ def parse_rigoristi(html: str) -> list[dict]:
     return out
 
 
+def parse_corner(html: str) -> list[dict]:
+    """Battitori di corner da SOSFanta: per squadra 'CORNER : A, B, C' (ordinati).
+    Ritorna [{squadra, nome, rank}] (rank 1 = battitore principale)."""
+    text = _clean_txt(re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I))
+    out = []
+    for team in SQUADRE_SERIEA:
+        m = re.search(re.escape(team) + r"\s+Punizioni\s*:.*?Corner\s*:\s*(.+)", text, re.I | re.S)
+        if not m:
+            continue
+        parts = [x.strip() for x in m.group(1).split(",")]
+        names = []
+        for i, pp in enumerate(parts):
+            if i == len(parts) - 1:  # l'ultimo è incollato alla prosa → tieni la prima parola
+                pp = pp.split()[0] if pp.split() else ""
+            if pp and len(pp.split()) <= 2:  # scarta la prosa (troppe parole)
+                names.append(pp)
+            if len(names) >= 6:
+                break
+        for rank, nm in enumerate(names, 1):
+            out.append({"squadra": team, "nome": nm, "rank": rank})
+    return out
+
+
 def parse_listone(html: str) -> list[dict]:
     parts = html.split('class="player-element"')[1:]
     players = []
@@ -283,6 +308,16 @@ def main():
     with open(os.path.join(RAW_DIR, "rigoristi.json"), "w", encoding="utf-8") as f:
         json.dump(rig, f, ensure_ascii=False)
     print(f"Rigoristi letti: {len(rig)}")
+
+    # corner (SOSFanta)
+    try:
+        cor = parse_corner(fetch_html(CORNER_URL))
+    except Exception as e:
+        cor = []
+        print("Attenzione: corner non letti:", e)
+    with open(os.path.join(RAW_DIR, "corner.json"), "w", encoding="utf-8") as f:
+        json.dump(cor, f, ensure_ascii=False)
+    print(f"Corner letti: {len(cor)}")
 
     from collections import Counter
     print(f"OK: {len(players)} giocatori -> {out}")

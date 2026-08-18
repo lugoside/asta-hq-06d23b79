@@ -79,8 +79,10 @@ pubblica uno nuovo, aggiornare `RIGORISTI_URL`. Per rigori/punizioni pre-asta va
 Per ogni squadra (heading): `Calci di rigore: A, B, C` e `Calci di punizione: X, Y` (ordinati).
 `parse_rigoristi` → [{squadra, nome, tipo: rigore|punizione, rank}]. `annota_rigoristi` match per
 (squadra, token nome), tiene il rank migliore per tipo → `rigoreRank` / `punizioneRank`.
-Boost: `FATTORE_RIGORISTA` (rank1 ×1.10, rank2 ×1.03), `FATTORE_PUNIZIONE` (rank1 ×1.03).
-Guardia: `meta.numRigoristi` / `meta.numPunizioni`.
+**Corner (assist)**: da SOSFanta `CORNER_URL` — `SQUADRA Punizioni : … Corner : A, B, C`.
+`parse_corner` → `cornerRank`. Pesi distinti (rigore gol alta freq > punizione gol rara > corner assist):
+`FATTORE_RIGORISTA` (rank1 ×1.10, rank2 ×1.03), `FATTORE_PUNIZIONE` (×1.04), `FATTORE_CORNER` (×1.02).
+Guardia: `meta.numRigoristi` / `numPunizioni` / `numCorner`.
 Fonte precedente (fallback possibile): `fantacalcio.it/rigoristi-serie-a` — URL stabile che
 si auto-aggiorna, ma solo rigori+corner (niente punizioni) e copertura minore.
 
