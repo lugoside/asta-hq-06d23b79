@@ -18,6 +18,7 @@ import re
 import sys
 import random
 import statistics
+import unicodedata
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -130,6 +131,57 @@ def annota_infortunati(players: list[dict]) -> int:
     return n
 
 
+def _deacc(s: str) -> str:
+    """Maiuscolo senza accenti, spazi normalizzati (per il match dei nomi)."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", s).strip().upper()
+
+
+# titolarità associata allo stato-formazione
+TIT_FORMAZIONE = {"titolare": 0.9, "ballottaggio": 0.6, "riserva": 0.35}
+RANK_STATUS = {"titolare": 3, "ballottaggio": 2, "riserva": 1}
+# quanto lo stato-formazione incide sul valore (e quindi sul prezzo consigliato)
+FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
+
+
+def annota_formazioni(players: list[dict]) -> int:
+    """Marca titolare/ballottaggio/riserva leggendo raw/formazioni.json (DAZN).
+    Match per (squadra, cognome): il nome DAZN è il cognome, il nome nel listone
+    inizia col cognome. In caso di più candidati prende quello con Qi più alto.
+    """
+    path = os.path.join(HERE, "raw", "formazioni.json")
+    if not os.path.exists(path):
+        return 0
+    with open(path, encoding="utf-8") as f:
+        form = json.load(f)
+    # indice per squadra
+    by_team = {}
+    for p in players:
+        by_team.setdefault(_deacc(p["squadra"]), []).append(p)
+    n = 0
+    for it in form:
+        team = _deacc(it["squadra"])
+        name = _deacc(it["nome"])
+        if not name:
+            continue
+        # tutte le parole del nome DAZN devono essere presenti nel nome completo del
+        # giocatore (in qualsiasi ordine): gestisce "Lautaro Martínez" vs "Martinez Lautaro"
+        tokens = [t for t in name.split(" ") if t]
+        cands = [p for p in by_team.get(team, []) if set(tokens) <= set(_deacc(p["nome"]).split(" "))]
+        if not cands:
+            continue
+        p = max(cands, key=lambda x: x.get("qi", 0))
+        st = it["status"]
+        # non declassare: se già titolare non lo rendo riserva per una cella successiva
+        if RANK_STATUS[st] > RANK_STATUS.get(p.get("formazione", ""), 0):
+            if "formazione" not in p:
+                n += 1
+            p["formazione"] = st
+            p["titolarita"] = TIT_FORMAZIONE[st]
+    return n
+
+
 def carica_raw() -> list[dict] | None:
     if os.path.exists(RAW):
         with open(RAW, encoding="utf-8") as f:
@@ -184,8 +236,14 @@ def main():
         valuation.QI_SCALE = nuova_scala
         valuta_lista(players)
 
-    # aggancia gli infortuni (solo dati reali) PRIMA di scrivere il file
+    # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
     n_infortunati = annota_infortunati(players) if is_reale else 0
+    n_formazioni = annota_formazioni(players) if is_reale else 0
+    # lo stato-formazione incide sul valore (riserve/ballottaggi valgono meno)
+    for p in players:
+        f = FATTORE_FORMAZIONE.get(p.get("formazione"))
+        if f and f != 1.0:
+            p["valoreBase"] = round(p["valoreBase"] * f, 2)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
@@ -206,6 +264,7 @@ def main():
         "isDemo": raw is None,
         "numGiocatori": len(players),
         "numInfortunati": n_infortunati,
+        "numFormazioni": n_formazioni,
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",

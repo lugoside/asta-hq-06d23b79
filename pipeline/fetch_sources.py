@@ -20,6 +20,12 @@ RAW_DIR = os.path.join(HERE, "raw")
 STAGIONE_DEFAULT = "2026-2027"
 URL_TMPL = "https://www.fantacalcio-online.com/it/serie-a/{stag}/quotazioni"
 INFORTUNATI_URL = "https://www.fantacalcio-online.com/it/infortunati-serie-a"
+FORMAZIONI_URL = "https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-titolari-moduli-e-ballottaggi-di-tutte-le-squadre/sxqiznnb92qk1ugq242gra6tp"
+SQUADRE_SERIEA = [
+    "Atalanta", "Bologna", "Cagliari", "Como", "Cremonese", "Fiorentina",
+    "Genoa", "Inter", "Juventus", "Lazio", "Lecce", "Milan", "Napoli",
+    "Parma", "Pisa", "Roma", "Sassuolo", "Torino", "Udinese", "Verona",
+]
 
 # codice ruolo (data-prop-name="role") -> ruolo Classic
 ROLE_MAP = {"1": "P", "2": "D", "4": "C", "6": "A"}
@@ -76,6 +82,41 @@ def parse_infortunati(html: str) -> list[dict]:
             "rientro": cells[3] if len(cells) > 3 else "",
             "fonte": cells[4] if len(cells) > 4 else "",
         })
+    return out
+
+
+def _clean_txt(s: str) -> str:
+    return re.sub(r"\s+", " ", ihtml.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
+
+
+def parse_formazioni(html: str) -> list[dict]:
+    """Estrae le formazioni-tipo da DAZN. Per ogni squadra con heading
+    'Probabile formazione X 2026-27' prende la prima tabella e ne legge le celle:
+      'Titolare (Riserva - Riserva2)'  oppure  'A / B (Riserva)' (ballottaggio).
+    Ritorna [{squadra, nome, status}] con status in titolare|ballottaggio|riserva.
+    """
+    out = []
+    for team in SQUADRE_SERIEA:
+        idx = html.find(f"Probabile formazione {team} 2026-27")
+        if idx < 0:
+            continue
+        m = re.search(r"<table.*?</table>", html[idx:], re.S | re.I)
+        if not m:
+            continue
+        for cell in re.findall(r"<td[^>]*>(.*?)</td>", m.group(0), re.S | re.I):
+            txt = _clean_txt(cell)
+            if not txt:
+                continue
+            mm = re.match(r"^(.*?)\s*\((.*)\)\s*$", txt)
+            before, paren = (mm.group(1), mm.group(2)) if mm else (txt, "")
+            starters = [x.strip() for x in before.split("/") if x.strip()]
+            status = "ballottaggio" if len(starters) > 1 else "titolare"
+            for s in starters:
+                out.append({"squadra": team, "nome": s, "status": status})
+            for r in re.split(r"[-/]", paren):
+                r = r.strip()
+                if r:
+                    out.append({"squadra": team, "nome": r, "status": "riserva"})
     return out
 
 
@@ -143,10 +184,20 @@ def main():
     with open(os.path.join(RAW_DIR, "infortunati.json"), "w", encoding="utf-8") as f:
         json.dump(inf, f, ensure_ascii=False)
 
+    # probabili formazioni (DAZN)
+    try:
+        form = parse_formazioni(fetch_html(FORMAZIONI_URL))
+    except Exception as e:
+        form = []
+        print("Attenzione: formazioni non lette:", e)
+    with open(os.path.join(RAW_DIR, "formazioni.json"), "w", encoding="utf-8") as f:
+        json.dump(form, f, ensure_ascii=False)
+
     from collections import Counter
     print(f"OK: {len(players)} giocatori -> {out}")
     print(f"Listone aggiornato dalla fonte al: {data_fonte or 'n/d'}")
     print(f"Infortunati letti: {len(inf)}")
+    print(f"Voci formazioni lette: {len(form)}")
     print("Per ruolo:", dict(Counter(p["ruolo"] for p in players)))
     top = sorted(players, key=lambda p: -p["qi"])[:6]
     print("Top per valore:", ", ".join(f"{p['nome']}({p['qi']})" for p in top))

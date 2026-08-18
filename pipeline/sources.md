@@ -52,6 +52,19 @@ trova, la lista è vuota e `meta.numInfortunati` = 0 (segnale che la pagina è c
 NB: gli infortuni NON penalizzano automaticamente il prezzo (per un'asta stagionale
 un rientro a set/ott incide poco); sono mostrati come flag, l'utente decide con la manopola.
 
+## Probabili formazioni — DAZN ✅ (tabelle statiche)
+
+URL: `https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-...`
+Per ogni squadra c'è un heading **"Probabile formazione {Squadra} 2026-27"** seguito da
+una `<table>` con celle tipo `Titolare (Riserva - Riserva2)` o `A / B (Riserva)` (ballottaggio).
+`parse_formazioni` (fetch_sources) → [{squadra, nome, status}] con status titolare|ballottaggio|riserva.
+`build_players.annota_formazioni` aggancia per **(squadra, token del nome)** — match per parole
+in qualsiasi ordine e senza accenti (gestisce "Lautaro Martínez" ↔ "Martinez Lautaro").
+Imposta `formazione` + `titolarita`, e applica `FATTORE_FORMAZIONE` al valore
+(titolare ×1.0, ballottaggio ×0.9, riserva ×0.7 → incide sul prezzo consigliato).
+NB: le 3 neopromosse potrebbero non avere la sezione → i loro giocatori restano senza stato.
+Guardia: `meta.numFormazioni` piccolo/0 = pagina cambiata.
+
 ## Statistiche 2025/26 (presenze, fantamedia, gol, assist, rigori)
 
 NON presenti nella pagina quotazioni sopra (che dà valori/rating, non lo storico).
