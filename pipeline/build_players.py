@@ -12,6 +12,7 @@ Uso:  python build_players.py            # usa raw se c'è, altrimenti demo
       python build_players.py --demo     # forza il dataset demo
 """
 from __future__ import annotations
+import hashlib
 import json
 import os
 import re
@@ -305,10 +306,38 @@ def main():
         with open(sm, encoding="utf-8") as f:
             fonte_aggiornata = json.load(f).get("fonteAggiornata")
 
+    # --- monitoraggio FRESCHEZZA fonti: impronta per fonte, confrontata col run precedente ---
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    raw_dir = os.path.join(HERE, "raw")
+
+    def _fp(fname):
+        p = os.path.join(raw_dir, fname)
+        return hashlib.sha1(open(p, "rb").read()).hexdigest()[:12] if os.path.exists(p) else None
+
+    prev_sources = {}
+    if os.path.exists(OUT_META):
+        try:
+            prev_sources = (json.load(open(OUT_META, encoding="utf-8")) or {}).get("sources", {})
+        except Exception:
+            prev_sources = {}
+
+    def _status(name, fp):
+        prev = prev_sources.get(name, {})
+        return {"fp": fp, "lastChanged": now_iso if fp != prev.get("fp") else prev.get("lastChanged", now_iso)}
+
+    sources = {
+        "Listone": _status("Listone", fonte_aggiornata or _fp("listone.json")),
+        "Infortuni": _status("Infortuni", _fp("infortunati.json")),
+        "Formazioni": _status("Formazioni", _fp("formazioni.json")),
+        "Rigori/Punizioni": _status("Rigori/Punizioni", _fp("rigoristi.json")),
+        "Corner": _status("Corner", _fp("corner.json")),
+    }
+
     per_ruolo = {r: sum(1 for p in players if p["ruolo"] == r) for r in ("P", "D", "C", "A")}
     meta = {
-        "aggiornato": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "aggiornato": now_iso,
         "fonteAggiornata": fonte_aggiornata,
+        "sources": sources,
         "fonte": fonte,
         "isDemo": raw is None,
         "numGiocatori": len(players),

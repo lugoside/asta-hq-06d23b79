@@ -467,6 +467,24 @@ function renderImpostazioni() {
     <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
   renderBackups();
   renderSync();
+  renderSourcesInfo();
+}
+
+// freschezza delle fonti: da quanti giorni ogni pagina non cambia (⚠️ se ferma da un po')
+function renderSourcesInfo() {
+  const el = document.getElementById("sourcesInfo"); if (!el) return;
+  const src = META.sources || {};
+  const names = Object.keys(src);
+  if (!names.length) { el.innerHTML = ""; return; }
+  const STALE = 5, now = Date.now();
+  const rows = names.map((name) => {
+    const s = src[name];
+    if (!s || !s.lastChanged) return `• ${name}: —`;
+    const days = Math.floor((now - new Date(s.lastChanged).getTime()) / 86400000);
+    const quando = days <= 0 ? "oggi" : days === 1 ? "ieri" : `${days} giorni fa`;
+    return `${days >= STALE ? "⚠️" : "•"} ${name}: cambiata ${quando}`;
+  });
+  el.innerHTML = "<b>Freschezza fonti</b> <span style='opacity:.7'>(⚠️ = ferma da ≥5 giorni → valuta una nuova fonte)</span><br>" + rows.join("<br>");
 }
 
 function renderSync() {
