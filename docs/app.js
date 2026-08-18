@@ -30,6 +30,8 @@ let PLAYERS = [];
 let META = {};
 let BOARD = null;
 let selectedId = null;
+// flusso di acquisto nella scheda Asta: idle → chooseOpp → confirm
+let buyFlow = { mode: "idle", team: null, price: null };
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
@@ -291,19 +293,38 @@ function renderAsta() {
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">
         <button class="step" data-step="-1">−</button>
-        <input id="priceInput" type="number" inputmode="numeric" min="1" value="${Math.max(1, p.prezzoConsigliato)}" />
+        <input id="priceInput" type="number" inputmode="numeric" min="1" value="${buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato)}" />
         <button class="step" data-step="1">+</button>
       </div>
-      <select class="opp-select mini-select" id="oppSelect" style="width:100%">
-        ${CONFIG.opponents.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}
-      </select>
-      <div class="buy-actions">
-        <button class="btn me" data-buy="me">✓ Preso da ${esc(CONFIG.myName || "IO")}</button>
-        <button class="btn opp" data-buy="opp">Preso da avversario</button>
-      </div>`}
+      ${buyActionsHtml(p)}`}
     `;
   }
   renderRecent();
+}
+
+// Area azioni di acquisto: cambia in base allo stato del flusso (idle/chooseOpp/confirm)
+function buyActionsHtml(p) {
+  if (buyFlow.mode === "chooseOpp") {
+    return `<div class="flow-title">A quale squadra è andato?</div>
+      <div class="opp-grid">${CONFIG.opponents.map((o) => `<button class="btn opp" data-oppteam="${esc(o)}">${esc(o)}</button>`).join("")}</div>
+      <button class="btn ghost full" data-flow="idle" style="margin-top:8px">← indietro</button>`;
+  }
+  if (buyFlow.mode === "confirm") {
+    const price = buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato);
+    return `<div class="confirm-box">Assegni <b>${esc(p.nome)}</b><br>a <b>${esc(buyFlow.team)}</b> per <b>${price}</b> crediti?</div>
+      <div class="buy-actions">
+        <button class="btn me" data-confirm="1">✓ OK, conferma</button>
+        <button class="btn ghost" data-flow="chooseOpp">← cambia</button>
+      </div>`;
+  }
+  return `<div class="buy-actions">
+      <button class="btn me" data-buy="me">✓ Preso da ${esc(CONFIG.myName || "IO")}</button>
+      <button class="btn opp" data-flow="chooseOpp">Preso da avversario →</button>
+    </div>`;
+}
+function captureBuyPrice() {
+  const inp = document.getElementById("priceInput");
+  if (inp) buyFlow.price = Math.max(1, Math.round(Number(inp.value) || 1));
 }
 
 function renderRecent() {
@@ -457,6 +478,7 @@ function updateSplitSum() {
 // ---------------------------------------------------------------------------
 function selectPlayer(id) {
   selectedId = id;
+  buyFlow = { mode: "idle", team: null, price: null };
   setScreen("asta");
   const s = document.getElementById("search"); if (s) s.value = "";
   document.getElementById("searchResults").innerHTML = "";
@@ -472,6 +494,7 @@ function recordPurchase(team) {
   persist(); snapshotNow(); recompute();
   toast(`${p.nome} → ${teamName(team)} a ${price}`);
   selectedId = null;
+  buyFlow = { mode: "idle", team: null, price: null };
   renderAll();
 }
 function undoPurchaseIdx(idx) {
@@ -541,9 +564,15 @@ function wire() {
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
     const step = e.target.closest("[data-step]");
-    if (step) { const inp = document.getElementById("priceInput"); inp.value = Math.max(1, (Number(inp.value) || 1) + Number(step.dataset.step)); return; }
+    if (step) { const inp = document.getElementById("priceInput"); const v = Math.max(1, (Number(inp.value) || 1) + Number(step.dataset.step)); inp.value = v; buyFlow.price = v; return; }
     const buy = e.target.closest("[data-buy]");
-    if (buy) { recordPurchase(buy.dataset.buy === "me" ? MY_TEAM : document.getElementById("oppSelect").value); return; }
+    if (buy) { recordPurchase(MY_TEAM); return; }
+    const flow = e.target.closest("[data-flow]");
+    if (flow) { captureBuyPrice(); buyFlow.mode = flow.dataset.flow; if (flow.dataset.flow === "idle") buyFlow.team = null; renderAsta(); return; }
+    const oppteam = e.target.closest("[data-oppteam]");
+    if (oppteam) { captureBuyPrice(); buyFlow.team = oppteam.dataset.oppteam; buyFlow.mode = "confirm"; renderAsta(); return; }
+    const confirmBuy = e.target.closest("[data-confirm]");
+    if (confirmBuy) { recordPurchase(buyFlow.team); return; }
     const undo = e.target.closest("[data-undo]");
     if (undo) { undoPurchaseByPlayer(undo.dataset.undo); return; }
     const undoidx = e.target.closest("[data-undoidx]");
