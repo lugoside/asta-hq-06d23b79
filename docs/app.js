@@ -33,7 +33,13 @@ let selectedId = null;
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
-let SYNC = load(LS.sync, { url: "", code: "", on: false });
+// Default per questa lega (Valerio): URL + Codice preimpostati, sync attiva.
+// Vengono usati solo se non c'è già una configurazione salvata sul dispositivo.
+let SYNC = load(LS.sync, {
+  url: "https://fantaasta-62ee7-default-rtdb.europe-west1.firebasedatabase.app/",
+  code: "lugoasta",
+  on: true,
+});
 let syncSeenTs = load(LS.syncSeen, 0);  // ultimo timestamp (del server) osservato
 let pendingPush = false;                // ho modifiche locali non ancora confermate dal cloud
 let DEVICE_ID = load(LS.device, "");
