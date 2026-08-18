@@ -7,7 +7,7 @@ import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals } from "./en
 const LS = {
   config: "fa_config", purchases: "fa_purchases", fav: "fa_favorites",
   players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
-  sync: "fa_sync", stateTs: "fa_state_ts", device: "fa_device",
+  sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
 };
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
@@ -34,7 +34,8 @@ const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, h
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
 let SYNC = load(LS.sync, { url: "", code: "", on: false });
-let stateUpdatedAt = load(LS.stateTs, 0);
+let syncSeenTs = load(LS.syncSeen, 0);  // ultimo timestamp (del server) osservato
+let pendingPush = false;                // ho modifiche locali non ancora confermate dal cloud
 let DEVICE_ID = load(LS.device, "");
 if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
 let _es = null, _pushTimer = null, _pollId = null, _syncStatus = "off";
@@ -45,9 +46,9 @@ function load(key, fallback) {
 }
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function persist() {
-  stateUpdatedAt = Date.now();
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]); save(LS.stateTs, stateUpdatedAt);
+  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
   scheduleSnapshot();
+  pendingPush = true;
   schedulePush();
 }
 
@@ -78,31 +79,56 @@ function syncNodeUrl() {
   return SYNC.url.replace(/\/+$/, "") + "/leghe/" + encodeURIComponent(SYNC.code.trim()) + ".json";
 }
 function setSyncStatus(s) { _syncStatus = s; if (ui.screen === "impostazioni") renderSync(); }
+function haveLocal() {
+  if (PURCHASES.length || FAVORITES.size) return true;
+  const d = defaultConfig();
+  return JSON.stringify([CONFIG.myName, CONFIG.opponents, CONFIG.splitPct, CONFIG.roster, CONFIG.numTeams, CONFIG.budgetPerTeam])
+       !== JSON.stringify([d.myName, d.opponents, d.splitPct, d.roster, d.numTeams, d.budgetPerTeam]);
+}
 
 function schedulePush() { if (!SYNC.on) return; clearTimeout(_pushTimer); _pushTimer = setTimeout(pushStateNow, 800); }
 async function pushStateNow() {
   const url = syncNodeUrl(); if (!SYNC.on || !url) return;
-  const doc = { updatedAt: stateUpdatedAt || Date.now(), deviceId: DEVICE_ID, config: CONFIG, purchases: PURCHASES, favorites: [...FAVORITES] };
+  const doc = {
+    updatedAt: { ".sv": "timestamp" }, // il server Firebase mette la SUA ora (unica per tutti i dispositivi)
+    deviceId: DEVICE_ID, config: CONFIG, purchases: PURCHASES, favorites: [...FAVORITES],
+  };
   try {
     await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
-    setSyncStatus("ok");
+    setSyncStatus("ok"); // pendingPush si azzera quando torna l'eco col timestamp del server
   } catch { setSyncStatus("err"); }
 }
 function adoptRemote(doc) {
   PURCHASES = Array.isArray(doc.purchases) ? doc.purchases : [];
   CONFIG = doc.config ? { ...defaultConfig(), ...doc.config } : CONFIG;
   FAVORITES = new Set(doc.favorites || []);
-  stateUpdatedAt = doc.updatedAt || Date.now();
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]); save(LS.stateTs, stateUpdatedAt);
+  pendingPush = false;
+  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
   snapshotNow();
   recompute(); renderAll();
   toast("Sincronizzato da un altro dispositivo");
+}
+// Gestisce un documento ricevuto dal cloud. Ritorna 'adopted' | 'echo' | 'ignored' | 'invalid'.
+function handleRemote(doc) {
+  if (!doc || typeof doc.updatedAt !== "number") return "invalid";
+  if (doc.deviceId === DEVICE_ID) {            // eco di una MIA scrittura
+    if (doc.updatedAt > syncSeenTs) { syncSeenTs = doc.updatedAt; save(LS.syncSeen, syncSeenTs); }
+    pendingPush = false;
+    return "echo";
+  }
+  if (doc.updatedAt > syncSeenTs) {            // modifica più recente di un ALTRO dispositivo
+    syncSeenTs = doc.updatedAt; save(LS.syncSeen, syncSeenTs);
+    adoptRemote(doc);
+    return "adopted";
+  }
+  return "ignored";
 }
 async function pullOnce() {
   const url = syncNodeUrl(); if (!SYNC.on || !url) return;
   try {
     const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
-    if (remote && remote.updatedAt && remote.updatedAt > (stateUpdatedAt || 0) && remote.deviceId !== DEVICE_ID) adoptRemote(remote);
+    handleRemote(remote);
+    if (pendingPush) pushStateNow();           // ritrasmetti modifiche locali non ancora confermate
     setSyncStatus("ok");
   } catch { setSyncStatus("err"); }
 }
@@ -110,8 +136,9 @@ async function reconcileSync() {
   const url = syncNodeUrl(); if (!SYNC.on || !url) return;
   try {
     const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
-    if (remote && remote.updatedAt && remote.updatedAt > (stateUpdatedAt || 0)) adoptRemote(remote);
-    else if (!remote || !remote.updatedAt || remote.updatedAt < (stateUpdatedAt || 0)) await pushStateNow();
+    const res = handleRemote(remote);
+    if (res === "invalid" && haveLocal()) pushStateNow();   // cloud vuoto → semina con lo stato locale
+    else if (res === "echo" && pendingPush) pushStateNow();  // il cloud è "nostro" ma abbiamo modifiche in sospeso
     setSyncStatus("ok");
   } catch { setSyncStatus("err"); }
 }
@@ -122,12 +149,8 @@ function connectSSE() {
     _es = new EventSource(url);
     const handler = (ev) => {
       try {
-        const msg = JSON.parse(ev.data); const data = msg && msg.data;
-        if (msg && msg.path === "/" && data && data.updatedAt) {
-          if (data.deviceId === DEVICE_ID) return;
-          if (data.updatedAt <= (stateUpdatedAt || 0)) return;
-          adoptRemote(data);
-        }
+        const msg = JSON.parse(ev.data);
+        if (msg && msg.path === "/") handleRemote(msg.data);
       } catch {}
     };
     _es.addEventListener("put", handler);
@@ -139,7 +162,7 @@ function connectSSE() {
 function startSync() {
   if (!SYNC.on) return;
   reconcileSync().then(connectSSE);
-  if (!_pollId) _pollId = setInterval(pullOnce, 20000); // rete di sicurezza se l'SSE cade
+  if (!_pollId) _pollId = setInterval(pullOnce, 15000); // rete di sicurezza se l'SSE cade
 }
 function stopSync() {
   if (_es) { _es.close(); _es = null; }
