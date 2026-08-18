@@ -6,7 +6,13 @@ name: update-data
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC ogni giorno
+    # NB: gli orari cron di GitHub sono in UTC. A ago/set l'Italia è UTC+2 (CEST).
+    # Fino al 31/08: una volta al mattino, ~08:00 IT (06:00 UTC), ogni giorno di agosto.
+    - cron: "0 6 * 8 *"
+    # 1–2 settembre: 06:00/10:00/14:00/18:00/20:00 IT -> 04/08/12/16/18 UTC
+    - cron: "0 4,8,12,16,18 1,2 9 *"
+    # 3 settembre (giorno d'asta): 06:00/10:00/14:00/18:00 IT -> 04/08/12/16 UTC (ultimo alle 18:00 IT)
+    - cron: "0 4,8,12,16 3 9 *"
 
 permissions:
   contents: write
