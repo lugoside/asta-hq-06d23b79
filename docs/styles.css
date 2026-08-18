@@ -122,6 +122,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
   color: var(--muted); font-size: .82rem; font-weight: 600; }
 .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .mini-select { width: auto; padding: 7px 10px; font-size: .82rem; border-radius: 20px; }
+.ord-lbl { align-self: center; font-size: .8rem; color: var(--muted); }
 
 /* squadre */
 .team { padding: 12px; border-bottom: 1px solid var(--line); }

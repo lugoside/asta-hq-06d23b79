@@ -337,7 +337,7 @@ function renderListone() {
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
       <div class="grow"><div class="nome">${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)} · ${p.tier} · val ${p.valoreBase}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+        <div class="meta">${esc(p.squadra)} · ${p.tier} · Qi ${p.qi} · val ${Math.round(p.valoreBase)}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
       <span class="price">${p.taken ? p.takenPrice : p.prezzoConsigliato}</span>
     </div>`).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
