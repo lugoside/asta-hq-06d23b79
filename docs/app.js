@@ -292,6 +292,7 @@ function renderAsta() {
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
+      ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
       <div class="price-grid">
         <div class="box"><div class="v big">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
@@ -397,8 +398,8 @@ function renderListone() {
     <div class="row ${p.taken ? "taken" : ""}" data-pick="${p.id}">
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
-      <div class="grow"><div class="nome">${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)} · ${p.tier} · Qi ${p.qi} · val ${Math.round(p.valoreBase)}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+      <div class="grow"><div class="nome">${p.infortunato ? "🩹 " : ""}${esc(p.nome)}</div>
+        <div class="meta">${esc(p.squadra)} · ${p.tier} · Qi ${p.qi} · val ${Math.round(p.valoreBase)}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
       <span class="price">${p.taken ? p.takenPrice : p.prezzoConsigliato}</span>
     </div>`).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
@@ -445,6 +446,7 @@ function renderImpostazioni() {
     `Stagione <b>${META.stagione || "?"}</b> · ${META.numGiocatori || PLAYERS.length} giocatori · ` +
     (META.isDemo ? "<b style='color:var(--giallo)'>dati DEMO</b>" : "listone reale") +
     (META.fonteAggiornata ? `<br>📅 Listone aggiornato dalla fonte: <b>${esc(META.fonteAggiornata)}</b>` : "") +
+    (META.numInfortunati != null ? `<br>🩹 Infortunati segnalati: <b>${META.numInfortunati}</b>` : "") +
     `<br>⬇ Ultimo scaricamento: ${fmtScarico()}` +
     `<br>Fonte: ${esc(META.fonte || "—")}`;
 

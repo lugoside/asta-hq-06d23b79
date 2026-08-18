@@ -8,6 +8,7 @@ Uso:  python fetch_sources.py            # stagione di default
 """
 from __future__ import annotations
 import gzip
+import html as ihtml
 import json
 import os
 import re
@@ -18,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RAW_DIR = os.path.join(HERE, "raw")
 STAGIONE_DEFAULT = "2026-2027"
 URL_TMPL = "https://www.fantacalcio-online.com/it/serie-a/{stag}/quotazioni"
+INFORTUNATI_URL = "https://www.fantacalcio-online.com/it/infortunati-serie-a"
 
 # codice ruolo (data-prop-name="role") -> ruolo Classic
 ROLE_MAP = {"1": "P", "2": "D", "4": "C", "6": "A"}
@@ -54,6 +56,27 @@ def parse_data_fonte(html: str) -> str | None:
     """Estrae la data di aggiornamento dichiarata dalla fonte (es. 'aggiornata al 18/08/2026')."""
     m = re.search(r'aggiornat[ae]\s+al\s+(\d{1,2}/\d{1,2}/\d{2,4})', html, re.I)
     return m.group(1) if m else None
+
+
+def parse_infortunati(html: str) -> list[dict]:
+    """Estrae la tabella infortunati (statica) → lista di dict.
+    Colonne attese: Squadra | Calciatore | Motivo | Rientro previsto | Fonte.
+    """
+    m = re.search(r"<table.*?</table>", html, re.S | re.I)
+    if not m:
+        return []
+    out = []
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(0), re.S | re.I):
+        cells = [re.sub(r"\s+", " ", ihtml.unescape(re.sub(r"<[^>]+>", " ", c))).strip()
+                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S | re.I)]
+        if len(cells) < 4 or cells[0].lower() == "squadra":
+            continue
+        out.append({
+            "squadra": cells[0], "nome": cells[1], "motivo": cells[2],
+            "rientro": cells[3] if len(cells) > 3 else "",
+            "fonte": cells[4] if len(cells) > 4 else "",
+        })
+    return out
 
 
 def parse_listone(html: str) -> list[dict]:
@@ -111,9 +134,19 @@ def main():
     # sidecar con i metadati della fonte (data di aggiornamento del listone)
     with open(os.path.join(RAW_DIR, "source_meta.json"), "w", encoding="utf-8") as f:
         json.dump({"fonteAggiornata": data_fonte, "url": url}, f, ensure_ascii=False)
+    # infortunati (tabella statica separata)
+    try:
+        inf = parse_infortunati(fetch_html(INFORTUNATI_URL))
+    except Exception as e:
+        inf = []
+        print("Attenzione: infortunati non letti:", e)
+    with open(os.path.join(RAW_DIR, "infortunati.json"), "w", encoding="utf-8") as f:
+        json.dump(inf, f, ensure_ascii=False)
+
     from collections import Counter
     print(f"OK: {len(players)} giocatori -> {out}")
     print(f"Listone aggiornato dalla fonte al: {data_fonte or 'n/d'}")
+    print(f"Infortunati letti: {len(inf)}")
     print("Per ruolo:", dict(Counter(p["ruolo"] for p in players)))
     top = sorted(players, key=lambda p: -p["qi"])[:6]
     print("Top per valore:", ", ".join(f"{p['nome']}({p['qi']})" for p in top))

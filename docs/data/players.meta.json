@@ -1,9 +1,10 @@
 {
-  "aggiornato": "2026-08-18T09:06:20+00:00",
+  "aggiornato": "2026-08-18T15:30:29+00:00",
   "fonteAggiornata": "18/08/2026",
   "fonte": "fantacalcio-online.com — listone ufficiale 2026/27",
   "isDemo": false,
   "numGiocatori": 573,
+  "numInfortunati": 28,
   "perRuolo": {
     "P": 69,
     "D": 155,

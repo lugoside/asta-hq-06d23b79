@@ -14,6 +14,7 @@ Uso:  python build_players.py            # usa raw se c'è, altrimenti demo
 from __future__ import annotations
 import json
 import os
+import re
 import sys
 import random
 import statistics
@@ -102,6 +103,33 @@ def genera_demo(seed: int = 42) -> list[dict]:
     return players
 
 
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "")).strip().upper()
+
+
+def annota_infortunati(players: list[dict]) -> int:
+    """Marca i giocatori infortunati leggendo raw/infortunati.json (match squadra+nome)."""
+    path = os.path.join(HERE, "raw", "infortunati.json")
+    if not os.path.exists(path):
+        return 0
+    with open(path, encoding="utf-8") as f:
+        inf = json.load(f)
+    by_full = {(_norm(p["squadra"]), _norm(p["nome"])): p for p in players}
+    n = 0
+    for it in inf:
+        p = by_full.get((_norm(it["squadra"]), _norm(it["nome"])))
+        if not p:  # fallback: stessa squadra + stesso cognome (primo token)
+            sur = _norm(it["nome"]).split(" ")[0]
+            cand = [pl for pl in players if _norm(pl["squadra"]) == _norm(it["squadra"]) and _norm(pl["nome"]).split(" ")[0] == sur]
+            p = cand[0] if len(cand) == 1 else None
+        if p:
+            p["infortunato"] = True
+            p["rientro"] = it.get("rientro", "")
+            p["motivoInfortunio"] = it.get("motivo", "")
+            n += 1
+    return n
+
+
 def carica_raw() -> list[dict] | None:
     if os.path.exists(RAW):
         with open(RAW, encoding="utf-8") as f:
@@ -156,6 +184,9 @@ def main():
         valuation.QI_SCALE = nuova_scala
         valuta_lista(players)
 
+    # aggancia gli infortuni (solo dati reali) PRIMA di scrivere il file
+    n_infortunati = annota_infortunati(players) if is_reale else 0
+
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
         json.dump(players, f, ensure_ascii=False, separators=(",", ":"))
@@ -174,6 +205,7 @@ def main():
         "fonte": fonte,
         "isDemo": raw is None,
         "numGiocatori": len(players),
+        "numInfortunati": n_infortunati,
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",
