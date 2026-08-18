@@ -52,18 +52,24 @@ trova, la lista è vuota e `meta.numInfortunati` = 0 (segnale che la pagina è c
 NB: gli infortuni NON penalizzano automaticamente il prezzo (per un'asta stagionale
 un rientro a set/ott incide poco); sono mostrati come flag, l'utente decide con la manopola.
 
-## Probabili formazioni — DAZN ✅ (tabelle statiche)
+## Probabili formazioni — SOSFanta (PRIMARIA) ✅, DAZN fallback
 
-URL: `https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-...`
-Per ogni squadra c'è un heading **"Probabile formazione {Squadra} 2026-27"** seguito da
-una `<table>` con celle tipo `Titolare (Riserva - Riserva2)` o `A / B (Riserva)` (ballottaggio).
-`parse_formazioni` (fetch_sources) → [{squadra, nome, status}] con status titolare|ballottaggio|riserva.
-`build_players.annota_formazioni` aggancia per **(squadra, token del nome)** — match per parole
-in qualsiasi ordine e senza accenti (gestisce "Lautaro Martínez" ↔ "Martinez Lautaro").
-Imposta `formazione` + `titolarita`, e applica `FATTORE_FORMAZIONE` al valore
-(titolare ×1.0, ballottaggio ×0.9, riserva ×0.7 → incide sul prezzo consigliato).
-NB: le 3 neopromosse potrebbero non avere la sezione → i loro giocatori restano senza stato.
-Guardia: `meta.numFormazioni` piccolo/0 = pagina cambiata.
+**Primaria: SOSFanta** — `https://www.sosfanta.com/asta-fantacalcio/seriea-tutte-formazioni-tipo-...`
+Formato testo STABILE: `SQUADRA Formazione-tipo: Por; Dc/Dc, ...; ... . I ballottaggi: ...`.
+`parse_formazioni_sos` (rimuove i blocchi <script>/JSON-LD, poi regex) → [{squadra, nome, status}]
+con status titolare / ballottaggio (i `/` = ballottaggio). Copre tutte e 20 le squadre.
+Toglie le iniziali finali dai nomi (es. "Smolcic I.", "Sucic P").
+
+**Fallback: DAZN** — `.../probabili-formazioni-serie-a-2026-27-...` (heading "Probabile formazione X 2026-27" + tabella).
+⚠️ DAZN serve HTML VARIABILE: le 20 `<table>` non sono ancorate ai titoli e le posizioni cambiano
+a ogni richiesta → parsing inaffidabile. Usato solo se SOSFanta copre <15 squadre.
+
+`build_players.annota_formazioni` aggancia per **(squadra, token del nome)** — parole in
+qualsiasi ordine, senza accenti (gestisce "Lautaro Martínez" ↔ "Martinez Lautaro").
+Imposta `formazione` + `titolarita`; `FATTORE_FORMAZIONE` incide sul valore/prezzo
+(titolare ×1.0, ballottaggio ×0.9, riserva ×0.7). Guardia: `meta.numFormazioni` basso/0 = fonte cambiata.
+
+NB: la Serie A di questa lega è **Frosinone/Monza/Venezia** + 17 (allineata al listone). `SQUADRE_SERIEA` in fetch_sources.
 
 ## Statistiche 2025/26 (presenze, fantamedia, gol, assist, rigori)
 

@@ -21,10 +21,14 @@ STAGIONE_DEFAULT = "2026-2027"
 URL_TMPL = "https://www.fantacalcio-online.com/it/serie-a/{stag}/quotazioni"
 INFORTUNATI_URL = "https://www.fantacalcio-online.com/it/infortunati-serie-a"
 FORMAZIONI_URL = "https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-titolari-moduli-e-ballottaggi-di-tutte-le-squadre/sxqiznnb92qk1ugq242gra6tp"
+# SOSFanta copre anche le neopromosse (che DAZN non ha)
+FORMAZIONI_SOS_URL = "https://www.sosfanta.com/asta-fantacalcio/seriea-tutte-formazioni-tipo-fantacalcio-2026-2027-asta-consigli-chi-prendere/?refresh_ce"
+# DAZN copre tutte e 20 le squadre; SOSFanta resta come fallback (vuoto = disattivo)
+NEOPROMOSSE = []
 SQUADRE_SERIEA = [
-    "Atalanta", "Bologna", "Cagliari", "Como", "Cremonese", "Fiorentina",
-    "Genoa", "Inter", "Juventus", "Lazio", "Lecce", "Milan", "Napoli",
-    "Parma", "Pisa", "Roma", "Sassuolo", "Torino", "Udinese", "Verona",
+    "Atalanta", "Bologna", "Cagliari", "Como", "Fiorentina", "Frosinone",
+    "Genoa", "Inter", "Juventus", "Lazio", "Lecce", "Milan", "Monza",
+    "Napoli", "Parma", "Roma", "Sassuolo", "Torino", "Udinese", "Venezia",
 ]
 
 # codice ruolo (data-prop-name="role") -> ruolo Classic
@@ -89,34 +93,75 @@ def _clean_txt(s: str) -> str:
     return re.sub(r"\s+", " ", ihtml.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
 
 
+def _parse_formazione_table(table_html: str, team: str) -> list[dict]:
+    """Legge le celle di una tabella-formazione: 'Titolare (Ris - Ris2)' / 'A / B (Ris)'."""
+    out = []
+    for cell in re.findall(r"<td[^>]*>(.*?)</td>", table_html, re.S | re.I):
+        txt = _clean_txt(cell)
+        if not txt:
+            continue
+        mm = re.match(r"^(.*?)\s*\((.*)\)\s*$", txt)
+        before, paren = (mm.group(1), mm.group(2)) if mm else (txt, "")
+        starters = [x.strip() for x in before.split("/") if x.strip()]
+        status = "ballottaggio" if len(starters) > 1 else "titolare"
+        for s in starters:
+            out.append({"squadra": team, "nome": s, "status": status})
+        for r in re.split(r"[-/]", paren):
+            r = r.strip()
+            if r:
+                out.append({"squadra": team, "nome": r, "status": "riserva"})
+    return out
+
+
 def parse_formazioni(html: str) -> list[dict]:
-    """Estrae le formazioni-tipo da DAZN. Per ogni squadra con heading
-    'Probabile formazione X 2026-27' prende la prima tabella e ne legge le celle:
-      'Titolare (Riserva - Riserva2)'  oppure  'A / B (Riserva)' (ballottaggio).
-    Ritorna [{squadra, nome, status}] con status in titolare|ballottaggio|riserva.
+    """Estrae le formazioni-tipo da DAZN. La pagina ha un INDICE con gli stessi titoli
+    'Probabile formazione X 2026-27': prendiamo l'occorrenza (quella del contenuto)
+    seguita da una tabella entro ~3000 char senza altri titoli-squadra in mezzo.
     """
     out = []
     for team in SQUADRE_SERIEA:
-        idx = html.find(f"Probabile formazione {team} 2026-27")
-        if idx < 0:
-            continue
-        m = re.search(r"<table.*?</table>", html[idx:], re.S | re.I)
+        needle = f"Probabile formazione {team} 2026-27"
+        # tra le occorrenze del titolo, quella del CONTENUTO è l'unica con una
+        # tabella subito dopo (entro ~1500 char); le altre sono menzioni nel testo.
+        for mm in re.finditer(re.escape(needle), html):
+            mt = re.search(r"<table.*?</table>", html[mm.end(): mm.end() + 1500], re.S | re.I)
+            if mt:
+                out.extend(_parse_formazione_table(mt.group(0), team))
+                break
+    return out
+
+
+def parse_formazioni_sos(html: str, teams: list[str]) -> list[dict]:
+    """Formazioni-tipo da SOSFanta per squadre selezionate (es. neopromosse).
+    Formato testo: 'SQUADRA Formazione-tipo: Por; Dc/Dc, ...; ... . I ballottaggi: ...'
+    """
+    # via i blocchi <script> (JSON-LD) che contengono una copia troncata dell'articolo
+    html = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    text = _clean_txt(html)
+    out = []
+    for team in teams:
+        pats = ["Hellas Verona", "Verona"] if team == "Verona" else [team]
+        m = None
+        for pt in pats:
+            m = re.search(re.escape(pt) + r"\s+Formazione-tipo:\s*(.*?)\s+I ballottaggi", text, re.I | re.S)
+            if m:
+                break
         if not m:
             continue
-        for cell in re.findall(r"<td[^>]*>(.*?)</td>", m.group(0), re.S | re.I):
-            txt = _clean_txt(cell)
-            if not txt:
+        for slot in re.split(r"[;,]", m.group(1)):
+            slot = slot.strip().strip(".")
+            if not slot:
                 continue
-            mm = re.match(r"^(.*?)\s*\((.*)\)\s*$", txt)
-            before, paren = (mm.group(1), mm.group(2)) if mm else (txt, "")
-            starters = [x.strip() for x in before.split("/") if x.strip()]
-            status = "ballottaggio" if len(starters) > 1 else "titolare"
-            for s in starters:
-                out.append({"squadra": team, "nome": s, "status": status})
-            for r in re.split(r"[-/]", paren):
-                r = r.strip()
-                if r:
-                    out.append({"squadra": team, "nome": r, "status": "riserva"})
+            names = []
+            for nm in slot.split("/"):
+                nm = re.sub(r"\s+[A-Za-zÀ-ü]{1,2}\.?$", "", nm.strip()).strip()  # toglie l'iniziale finale (es. "Smolcic I.", "Sucic P")
+                if nm:
+                    names.append(nm)
+            if not names:
+                continue
+            status = "ballottaggio" if len(names) > 1 else "titolare"
+            for nm in names:
+                out.append({"squadra": team, "nome": nm, "status": status})
     return out
 
 
@@ -185,11 +230,21 @@ def main():
         json.dump(inf, f, ensure_ascii=False)
 
     # probabili formazioni (DAZN)
+    # Formazioni: SOSFanta è la PRIMARIA (formato testo stabile, tutte le squadre).
+    # DAZN resta come fallback (contenuto corretto ma HTML variabile → parsing inaffidabile).
     try:
-        form = parse_formazioni(fetch_html(FORMAZIONI_URL))
+        form = parse_formazioni_sos(fetch_html(FORMAZIONI_SOS_URL), SQUADRE_SERIEA)
     except Exception as e:
         form = []
-        print("Attenzione: formazioni non lette:", e)
+        print("Attenzione: formazioni SOS non lette:", e)
+    if len({x["squadra"] for x in form}) < 15:
+        try:
+            dazn = parse_formazioni(fetch_html(FORMAZIONI_URL))
+            if len({x["squadra"] for x in dazn}) > len({x["squadra"] for x in form}):
+                form = dazn
+                print("Uso il fallback DAZN per le formazioni")
+        except Exception as e:
+            print("Attenzione: fallback DAZN non letto:", e)
     with open(os.path.join(RAW_DIR, "formazioni.json"), "w", encoding="utf-8") as f:
         json.dump(form, f, ensure_ascii=False)
 
