@@ -764,6 +764,7 @@ function wire() {
     if (SYNC.on) { startSync(); toast("Sincronizzazione attivata"); } else { stopSync(); toast("Sincronizzazione disattivata"); }
     renderSync();
   });
+  document.getElementById("forceApp").addEventListener("click", forceAppUpdate);
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
   document.getElementById("importFile").addEventListener("change", importBackup);
@@ -815,6 +816,26 @@ async function init() {
   if (SYNC.on) startSync();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
+    // quando un nuovo service worker prende il controllo, ricarica una volta per avere l'ultima versione
+    let _refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (_refreshing) return; _refreshing = true; location.reload();
+    });
   }
+}
+
+// scialuppa: cancella cache + service worker e ricarica (per forzare l'ultima versione)
+async function forceAppUpdate() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const rs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map((k) => caches.delete(k)));
+    }
+  } catch {}
+  location.reload();
 }
 init();

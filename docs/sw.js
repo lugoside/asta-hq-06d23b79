@@ -1,7 +1,7 @@
 // Service worker: NETWORK-FIRST con fallback su cache.
 // Online → sempre l'ultima versione (app + dati). Offline → ultima copia salvata.
 // Così ogni aggiornamento del codice arriva subito, mantenendo la resilienza offline.
-const VERSION = "v13";
+const VERSION = "v14";
 const CACHE = "fa-" + VERSION;
 const SHELL_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js", "./engine.js",
@@ -23,9 +23,9 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    fetch(e.request)
+    // no-store: bypassa la cache HTTP del browser → online prendi SEMPRE l'ultima versione
+    fetch(e.request, { cache: "no-store" })
       .then((res) => {
-        // salva una copia aggiornata in cache per l'uso offline
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
         return res;
