@@ -41,6 +41,17 @@ for block in html.split('class="player-element"')[1:]:
 # prop() = regex  data-prop-name="X"[^>]*>([^<]*)<
 ```
 
+## Infortunati — fantacalcio-online.com ✅ senza login (tabella statica)
+
+URL: `https://www.fantacalcio-online.com/it/infortunati-serie-a`
+Tabella HTML **statica** (parse con `parse_infortunati` in fetch_sources.py):
+colonne Squadra | Calciatore ("COGNOME Nome") | Motivo | Rientro previsto | Fonte.
+`build_players.annota_infortunati` aggancia per (squadra, nome) → flag `infortunato`,
+`rientro`, `motivoInfortunio`. ~28-29 righe tipiche. Guardia: se la tabella non si
+trova, la lista è vuota e `meta.numInfortunati` = 0 (segnale che la pagina è cambiata).
+NB: gli infortuni NON penalizzano automaticamente il prezzo (per un'asta stagionale
+un rientro a set/ott incide poco); sono mostrati come flag, l'utente decide con la manopola.
+
 ## Statistiche 2025/26 (presenze, fantamedia, gol, assist, rigori)
 
 NON presenti nella pagina quotazioni sopra (che dà valori/rating, non lo storico).
