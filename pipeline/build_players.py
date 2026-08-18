@@ -143,6 +143,8 @@ TIT_FORMAZIONE = {"titolare": 0.9, "ballottaggio": 0.6, "riserva": 0.35}
 RANK_STATUS = {"titolare": 3, "ballottaggio": 2, "riserva": 1}
 # quanto lo stato-formazione incide sul valore (e quindi sul prezzo consigliato)
 FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
+# boost per il rigorista designato (rank 1 = titolare dei rigori)
+FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
 
 
 def annota_formazioni(players: list[dict]) -> int:
@@ -179,6 +181,32 @@ def annota_formazioni(players: list[dict]) -> int:
                 n += 1
             p["formazione"] = st
             p["titolarita"] = TIT_FORMAZIONE[st]
+    return n
+
+
+def annota_rigoristi(players: list[dict]) -> int:
+    """Marca i rigoristi (rank 1 = principale) leggendo raw/rigoristi.json,
+    match per (squadra, token del nome). Tiene il rank migliore (più basso).
+    """
+    path = os.path.join(HERE, "raw", "rigoristi.json")
+    if not os.path.exists(path):
+        return 0
+    with open(path, encoding="utf-8") as f:
+        rig = json.load(f)
+    by_team = {}
+    for p in players:
+        by_team.setdefault(_deacc(p["squadra"]), []).append(p)
+    n = 0
+    for it in rig:
+        tokens = [t for t in _deacc(it["nome"]).split(" ") if t]
+        cands = [p for p in by_team.get(_deacc(it["squadra"]), []) if set(tokens) <= set(_deacc(p["nome"]).split(" "))]
+        if not cands:
+            continue
+        p = max(cands, key=lambda x: x.get("qi", 0))
+        if "rigoreRank" not in p or it["rank"] < p["rigoreRank"]:
+            if "rigoreRank" not in p:
+                n += 1
+            p["rigoreRank"] = it["rank"]
     return n
 
 
@@ -239,11 +267,15 @@ def main():
     # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
     n_infortunati = annota_infortunati(players) if is_reale else 0
     n_formazioni = annota_formazioni(players) if is_reale else 0
-    # lo stato-formazione incide sul valore (riserve/ballottaggi valgono meno)
+    n_rigoristi = annota_rigoristi(players) if is_reale else 0
+    # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
     for p in players:
         f = FATTORE_FORMAZIONE.get(p.get("formazione"))
         if f and f != 1.0:
             p["valoreBase"] = round(p["valoreBase"] * f, 2)
+        rb = FATTORE_RIGORISTA.get(p.get("rigoreRank"))
+        if rb:
+            p["valoreBase"] = round(p["valoreBase"] * rb, 2)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
@@ -265,6 +297,7 @@ def main():
         "numGiocatori": len(players),
         "numInfortunati": n_infortunati,
         "numFormazioni": n_formazioni,
+        "numRigoristi": n_rigoristi,
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",

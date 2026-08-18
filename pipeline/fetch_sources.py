@@ -23,6 +23,7 @@ INFORTUNATI_URL = "https://www.fantacalcio-online.com/it/infortunati-serie-a"
 FORMAZIONI_URL = "https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-titolari-moduli-e-ballottaggi-di-tutte-le-squadre/sxqiznnb92qk1ugq242gra6tp"
 # SOSFanta copre anche le neopromosse (che DAZN non ha)
 FORMAZIONI_SOS_URL = "https://www.sosfanta.com/asta-fantacalcio/seriea-tutte-formazioni-tipo-fantacalcio-2026-2027-asta-consigli-chi-prendere/?refresh_ce"
+RIGORISTI_URL = "https://www.fantacalcio.it/rigoristi-serie-a"
 # DAZN copre tutte e 20 le squadre; SOSFanta resta come fallback (vuoto = disattivo)
 NEOPROMOSSE = []
 SQUADRE_SERIEA = [
@@ -165,6 +166,25 @@ def parse_formazioni_sos(html: str, teams: list[str]) -> list[dict]:
     return out
 
 
+def parse_rigoristi(html: str) -> list[dict]:
+    """Rigoristi da fantacalcio.it: per ogni squadra la lista ORDINATA sotto
+    'Rigori'. Ritorna [{squadra, nome, rank}] (rank 1 = rigorista principale).
+    """
+    out = []
+    for seg in re.split(r'<span class="team-name">', html)[1:]:
+        mt = re.match(r"\s*([^<]+)</span>", seg)
+        if not mt:
+            continue
+        team = ihtml.unescape(mt.group(1)).strip()
+        mr = re.search(r"<header[^>]*>\s*Rigori\s*</header>(.*?)</ol>", seg, re.S | re.I)
+        if not mr:
+            continue
+        names = re.findall(r'alt="Campioncino ([^"]+)"', mr.group(1))
+        for rank, nm in enumerate(names, 1):
+            out.append({"squadra": team, "nome": nm.strip(), "rank": rank})
+    return out
+
+
 def parse_listone(html: str) -> list[dict]:
     parts = html.split('class="player-element"')[1:]
     players = []
@@ -247,6 +267,16 @@ def main():
             print("Attenzione: fallback DAZN non letto:", e)
     with open(os.path.join(RAW_DIR, "formazioni.json"), "w", encoding="utf-8") as f:
         json.dump(form, f, ensure_ascii=False)
+
+    # rigoristi (fantacalcio.it)
+    try:
+        rig = parse_rigoristi(fetch_html(RIGORISTI_URL))
+    except Exception as e:
+        rig = []
+        print("Attenzione: rigoristi non letti:", e)
+    with open(os.path.join(RAW_DIR, "rigoristi.json"), "w", encoding="utf-8") as f:
+        json.dump(rig, f, ensure_ascii=False)
+    print(f"Rigoristi letti: {len(rig)}")
 
     from collections import Counter
     print(f"OK: {len(players)} giocatori -> {out}")

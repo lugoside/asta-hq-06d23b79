@@ -71,6 +71,15 @@ Imposta `formazione` + `titolarita`; `FATTORE_FORMAZIONE` incide sul valore/prez
 
 NB: la Serie A di questa lega è **Frosinone/Monza/Venezia** + 17 (allineata al listone). `SQUADRE_SERIEA` in fetch_sources.
 
+## Rigoristi — fantacalcio.it ✅ (HTML statico)
+
+URL: `https://www.fantacalcio.it/rigoristi-serie-a`
+Per squadra: `<span class="team-name">SQUADRA</span>` poi `<header>Rigori</header>` +
+`<ol>` con `<li>` ordinati (rank 1 = rigorista principale; nome in `alt="Campioncino X"`).
+`parse_rigoristi` → [{squadra, nome, rank}]. `annota_rigoristi` match per (squadra, token nome),
+tiene il rank migliore, e `FATTORE_RIGORISTA` dà boost al valore (rank1 ×1.10, rank2 ×1.03).
+La pagina ha anche "Calci d'angolo" (non usati) ma NON le punizioni. Guardia: `meta.numRigoristi`.
+
 ## Statistiche 2025/26 (presenze, fantamedia, gol, assist, rigori)
 
 NON presenti nella pagina quotazioni sopra (che dà valori/rating, non lo storico).
