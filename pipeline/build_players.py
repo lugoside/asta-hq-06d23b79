@@ -143,8 +143,9 @@ TIT_FORMAZIONE = {"titolare": 0.9, "ballottaggio": 0.6, "riserva": 0.35}
 RANK_STATUS = {"titolare": 3, "ballottaggio": 2, "riserva": 1}
 # quanto lo stato-formazione incide sul valore (e quindi sul prezzo consigliato)
 FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
-# boost per il rigorista designato (rank 1 = titolare dei rigori)
+# boost per il rigorista designato (rank 1 = titolare dei rigori) e per i battitori di punizione
 FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
+FATTORE_PUNIZIONE = {1: 1.03}
 
 
 def annota_formazioni(players: list[dict]) -> int:
@@ -203,10 +204,11 @@ def annota_rigoristi(players: list[dict]) -> int:
         if not cands:
             continue
         p = max(cands, key=lambda x: x.get("qi", 0))
-        if "rigoreRank" not in p or it["rank"] < p["rigoreRank"]:
-            if "rigoreRank" not in p:
+        field = "punizioneRank" if it.get("tipo") == "punizione" else "rigoreRank"
+        if field not in p or it["rank"] < p[field]:
+            if field not in p:
                 n += 1
-            p["rigoreRank"] = it["rank"]
+            p[field] = it["rank"]
     return n
 
 
@@ -276,6 +278,9 @@ def main():
         rb = FATTORE_RIGORISTA.get(p.get("rigoreRank"))
         if rb:
             p["valoreBase"] = round(p["valoreBase"] * rb, 2)
+        pb = FATTORE_PUNIZIONE.get(p.get("punizioneRank"))
+        if pb:
+            p["valoreBase"] = round(p["valoreBase"] * pb, 2)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
@@ -297,7 +302,8 @@ def main():
         "numGiocatori": len(players),
         "numInfortunati": n_infortunati,
         "numFormazioni": n_formazioni,
-        "numRigoristi": n_rigoristi,
+        "numRigoristi": sum(1 for p in players if p.get("rigoreRank")),
+        "numPunizioni": sum(1 for p in players if p.get("punizioneRank")),
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",

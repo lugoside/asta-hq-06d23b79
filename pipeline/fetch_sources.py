@@ -23,7 +23,8 @@ INFORTUNATI_URL = "https://www.fantacalcio-online.com/it/infortunati-serie-a"
 FORMAZIONI_URL = "https://www.dazn.com/it-IT/news/calcio/probabili-formazioni-serie-a-2026-27-titolari-moduli-e-ballottaggi-di-tutte-le-squadre/sxqiznnb92qk1ugq242gra6tp"
 # SOSFanta copre anche le neopromosse (che DAZN non ha)
 FORMAZIONI_SOS_URL = "https://www.sosfanta.com/asta-fantacalcio/seriea-tutte-formazioni-tipo-fantacalcio-2026-2027-asta-consigli-chi-prendere/?refresh_ce"
-RIGORISTI_URL = "https://www.fantacalcio.it/rigoristi-serie-a"
+# Gazzetta: per ogni squadra 'Calci di rigore: ...' e 'Calci di punizione: ...' (ordinati)
+RIGORISTI_URL = "https://www.gazzetta.it/calcio/fantanews/strumenti-fantacalcio/rigoristi/17-08-2026/rigoristi-serie-a-fantacalcio-tiratori-calci-da-fermo-punizioni.shtml"
 # DAZN copre tutte e 20 le squadre; SOSFanta resta come fallback (vuoto = disattivo)
 NEOPROMOSSE = []
 SQUADRE_SERIEA = [
@@ -167,21 +168,26 @@ def parse_formazioni_sos(html: str, teams: list[str]) -> list[dict]:
 
 
 def parse_rigoristi(html: str) -> list[dict]:
-    """Rigoristi da fantacalcio.it: per ogni squadra la lista ORDINATA sotto
-    'Rigori'. Ritorna [{squadra, nome, rank}] (rank 1 = rigorista principale).
+    """Rigoristi e battitori di punizione da Gazzetta. Per ogni squadra (heading):
+    'Calci di rigore: A, B, C' e 'Calci di punizione: X, Y' (ordinati).
+    Ritorna [{squadra, nome, tipo: rigore|punizione, rank}] (rank 1 = principale).
     """
+    html = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    headings = [(m.start(), m.end(), _clean_txt(m.group(1)).strip())
+                for m in re.finditer(r"<h[2-4][^>]*>(.*?)</h[2-4]>", html, re.S | re.I)]
     out = []
-    for seg in re.split(r'<span class="team-name">', html)[1:]:
-        mt = re.match(r"\s*([^<]+)</span>", seg)
-        if not mt:
+    for i, (s, e, team) in enumerate(headings):
+        if team not in SQUADRE_SERIEA:
             continue
-        team = ihtml.unescape(mt.group(1)).strip()
-        mr = re.search(r"<header[^>]*>\s*Rigori\s*</header>(.*?)</ol>", seg, re.S | re.I)
-        if not mr:
-            continue
-        names = re.findall(r'alt="Campioncino ([^"]+)"', mr.group(1))
-        for rank, nm in enumerate(names, 1):
-            out.append({"squadra": team, "nome": nm.strip(), "rank": rank})
+        end = headings[i + 1][0] if i + 1 < len(headings) else len(html)
+        block = _clean_txt(html[e:end])
+        for tipo, label in (("rigore", "Calci di rigore"), ("punizione", "Calci di punizione")):
+            mm = re.search(label + r":\s*(.*?)(?:\s*Calci di (?:rigore|punizione):|\.|$)", block, re.I)
+            if not mm:
+                continue
+            names = [n.strip() for n in re.split(r"[,;]| e ", mm.group(1)) if n.strip()]
+            for rank, nm in enumerate(names, 1):
+                out.append({"squadra": team, "nome": nm, "tipo": tipo, "rank": rank})
     return out
 
 

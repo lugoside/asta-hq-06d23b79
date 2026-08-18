@@ -71,14 +71,18 @@ Imposta `formazione` + `titolarita`; `FATTORE_FORMAZIONE` incide sul valore/prez
 
 NB: la Serie A di questa lega è **Frosinone/Monza/Venezia** + 17 (allineata al listone). `SQUADRE_SERIEA` in fetch_sources.
 
-## Rigoristi — fantacalcio.it ✅ (HTML statico)
+## Rigoristi e punizioni — Gazzetta ✅ (HTML statico)
 
-URL: `https://www.fantacalcio.it/rigoristi-serie-a`
-Per squadra: `<span class="team-name">SQUADRA</span>` poi `<header>Rigori</header>` +
-`<ol>` con `<li>` ordinati (rank 1 = rigorista principale; nome in `alt="Campioncino X"`).
-`parse_rigoristi` → [{squadra, nome, rank}]. `annota_rigoristi` match per (squadra, token nome),
-tiene il rank migliore, e `FATTORE_RIGORISTA` dà boost al valore (rank1 ×1.10, rank2 ×1.03).
-La pagina ha anche "Calci d'angolo" (non usati) ma NON le punizioni. Guardia: `meta.numRigoristi`.
+URL: `https://www.gazzetta.it/.../rigoristi/17-08-2026/rigoristi-serie-a-...shtml`
+⚠️ URL DATATO (17-08): non si auto-aggiorna a un articolo più recente; se Gazzetta ne
+pubblica uno nuovo, aggiornare `RIGORISTI_URL`. Per rigori/punizioni pre-asta va bene.
+Per ogni squadra (heading): `Calci di rigore: A, B, C` e `Calci di punizione: X, Y` (ordinati).
+`parse_rigoristi` → [{squadra, nome, tipo: rigore|punizione, rank}]. `annota_rigoristi` match per
+(squadra, token nome), tiene il rank migliore per tipo → `rigoreRank` / `punizioneRank`.
+Boost: `FATTORE_RIGORISTA` (rank1 ×1.10, rank2 ×1.03), `FATTORE_PUNIZIONE` (rank1 ×1.03).
+Guardia: `meta.numRigoristi` / `meta.numPunizioni`.
+Fonte precedente (fallback possibile): `fantacalcio.it/rigoristi-serie-a` — URL stabile che
+si auto-aggiorna, ma solo rigori+corner (niente punizioni) e copertura minore.
 
 ## Statistiche 2025/26 (presenze, fantamedia, gol, assist, rigori)
 
