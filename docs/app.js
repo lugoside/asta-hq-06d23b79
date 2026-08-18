@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals } from "./en
 const LS = {
   config: "fa_config", purchases: "fa_purchases", fav: "fa_favorites",
   players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
+  sync: "fa_sync", stateTs: "fa_state_ts", device: "fa_device",
 };
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
@@ -31,14 +32,23 @@ let BOARD = null;
 let selectedId = null;
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "" };
 
+// --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
+let SYNC = load(LS.sync, { url: "", code: "", on: false });
+let stateUpdatedAt = load(LS.stateTs, 0);
+let DEVICE_ID = load(LS.device, "");
+if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
+let _es = null, _pushTimer = null, _pollId = null, _syncStatus = "off";
+
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
 }
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function persist() {
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
+  stateUpdatedAt = Date.now();
+  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]); save(LS.stateTs, stateUpdatedAt);
   scheduleSnapshot();
+  schedulePush();
 }
 
 // --- backup automatico: anello di snapshot con data/ora ---
@@ -57,6 +67,84 @@ function snapshotNow() {
     while (hist.length > HISTORY_MAX) hist.shift();
     save(LS.history, hist);
   } catch {}
+}
+
+// ===================== Sincronizzazione cloud (Firebase RTDB REST) =====================
+// Offline-first: la memoria locale resta la base; il cloud allinea i dispositivi.
+// Nodo condiviso: <url>/leghe/<codice>.json  — chi ha il codice legge/scrive (regole Firebase).
+function persistSync() { save(LS.sync, SYNC); }
+function syncNodeUrl() {
+  if (!SYNC.url || !SYNC.code) return null;
+  return SYNC.url.replace(/\/+$/, "") + "/leghe/" + encodeURIComponent(SYNC.code.trim()) + ".json";
+}
+function setSyncStatus(s) { _syncStatus = s; if (ui.screen === "impostazioni") renderSync(); }
+
+function schedulePush() { if (!SYNC.on) return; clearTimeout(_pushTimer); _pushTimer = setTimeout(pushStateNow, 800); }
+async function pushStateNow() {
+  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
+  const doc = { updatedAt: stateUpdatedAt || Date.now(), deviceId: DEVICE_ID, config: CONFIG, purchases: PURCHASES, favorites: [...FAVORITES] };
+  try {
+    await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
+    setSyncStatus("ok");
+  } catch { setSyncStatus("err"); }
+}
+function adoptRemote(doc) {
+  PURCHASES = Array.isArray(doc.purchases) ? doc.purchases : [];
+  CONFIG = doc.config ? { ...defaultConfig(), ...doc.config } : CONFIG;
+  FAVORITES = new Set(doc.favorites || []);
+  stateUpdatedAt = doc.updatedAt || Date.now();
+  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]); save(LS.stateTs, stateUpdatedAt);
+  snapshotNow();
+  recompute(); renderAll();
+  toast("Sincronizzato da un altro dispositivo");
+}
+async function pullOnce() {
+  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
+  try {
+    const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
+    if (remote && remote.updatedAt && remote.updatedAt > (stateUpdatedAt || 0) && remote.deviceId !== DEVICE_ID) adoptRemote(remote);
+    setSyncStatus("ok");
+  } catch { setSyncStatus("err"); }
+}
+async function reconcileSync() {
+  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
+  try {
+    const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
+    if (remote && remote.updatedAt && remote.updatedAt > (stateUpdatedAt || 0)) adoptRemote(remote);
+    else if (!remote || !remote.updatedAt || remote.updatedAt < (stateUpdatedAt || 0)) await pushStateNow();
+    setSyncStatus("ok");
+  } catch { setSyncStatus("err"); }
+}
+function connectSSE() {
+  if (_es) { _es.close(); _es = null; }
+  const url = syncNodeUrl(); if (!SYNC.on || !url || typeof EventSource === "undefined") return;
+  try {
+    _es = new EventSource(url);
+    const handler = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data); const data = msg && msg.data;
+        if (msg && msg.path === "/" && data && data.updatedAt) {
+          if (data.deviceId === DEVICE_ID) return;
+          if (data.updatedAt <= (stateUpdatedAt || 0)) return;
+          adoptRemote(data);
+        }
+      } catch {}
+    };
+    _es.addEventListener("put", handler);
+    _es.addEventListener("patch", handler);
+    _es.onopen = () => setSyncStatus("ok");
+    _es.onerror = () => setSyncStatus("err");
+  } catch { setSyncStatus("err"); }
+}
+function startSync() {
+  if (!SYNC.on) return;
+  reconcileSync().then(connectSSE);
+  if (!_pollId) _pollId = setInterval(pullOnce, 20000); // rete di sicurezza se l'SSE cade
+}
+function stopSync() {
+  if (_es) { _es.close(); _es = null; }
+  if (_pollId) { clearInterval(_pollId); _pollId = null; }
+  setSyncStatus("off");
 }
 
 // config normalizzata per l'engine (splitPct → budgetSplit che somma 1)
@@ -270,6 +358,19 @@ function renderImpostazioni() {
   document.getElementById("oppSettings").innerHTML = CONFIG.opponents.map((o, i) => `
     <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
   renderBackups();
+  renderSync();
+}
+
+function renderSync() {
+  const u = document.getElementById("syncUrl"); if (!u) return;
+  if (document.activeElement !== u) u.value = SYNC.url || "";
+  const c = document.getElementById("syncCode");
+  if (document.activeElement !== c) c.value = SYNC.code || "";
+  document.getElementById("syncToggle").textContent = SYNC.on ? "⏸ Disattiva sincronizzazione" : "▶ Attiva sincronizzazione";
+  const st = { ok: "🟢 connesso e allineato", err: "🔴 errore di connessione (controlla URL, Codice e regole Firebase)", off: "⚪ spenta" }[_syncStatus] || "";
+  document.getElementById("syncStatus").innerHTML =
+    (SYNC.on ? "Stato: " + st : "Spenta") +
+    `<br>Inserisci lo <b>stesso URL e Codice Lega</b> su PC e telefono, poi attiva: i dati resteranno allineati da soli.`;
 }
 
 function renderBackups() {
@@ -447,6 +548,19 @@ function wire() {
       toast("Asta azzerata (recuperabile dai backup)"); setScreen("asta");
     }
   });
+  // --- sincronizzazione ---
+  document.getElementById("syncUrl").addEventListener("change", (e) => { SYNC.url = e.target.value.trim(); persistSync(); if (SYNC.on) startSync(); });
+  document.getElementById("syncCode").addEventListener("change", (e) => { SYNC.code = e.target.value.trim(); persistSync(); if (SYNC.on) startSync(); });
+  document.getElementById("syncGen").addEventListener("click", () => {
+    SYNC.code = "asta-" + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8);
+    persistSync(); renderSync();
+  });
+  document.getElementById("syncToggle").addEventListener("click", () => {
+    if (!SYNC.on && (!SYNC.url || !SYNC.code)) { toast("Inserisci URL e Codice Lega"); return; }
+    SYNC.on = !SYNC.on; persistSync();
+    if (SYNC.on) { startSync(); toast("Sincronizzazione attivata"); } else { stopSync(); toast("Sincronizzazione disattivata"); }
+    renderSync();
+  });
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
   document.getElementById("importFile").addEventListener("change", importBackup);
@@ -494,6 +608,7 @@ async function init() {
   catch { document.getElementById("calledCard").textContent = "Impossibile caricare i dati."; return; }
   recompute();
   renderAll();
+  if (SYNC.on) startSync();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }

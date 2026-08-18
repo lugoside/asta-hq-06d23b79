@@ -88,6 +88,21 @@
         </div>
       </div>
 
+      <div class="section-title">Sincronizzazione tra dispositivi</div>
+      <div class="setting">
+        <label>URL del database (Firebase)</label>
+        <input id="syncUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://....firebasedatabase.app" />
+      </div>
+      <div class="setting">
+        <label>Codice Lega (identico su tutti i dispositivi)</label>
+        <div style="display:flex; gap:8px">
+          <input id="syncCode" type="text" autocomplete="off" placeholder="es. asta2026-xyz" />
+          <button class="btn ghost" id="syncGen" style="width:auto; white-space:nowrap; padding:0 14px">Genera</button>
+        </div>
+      </div>
+      <button class="btn me full" id="syncToggle">▶ Attiva sincronizzazione</button>
+      <div class="hint" id="syncStatus" style="margin-top:8px"></div>
+
       <div class="section-title">Ripartizione budget per ruolo</div>
       <div id="splitSettings"></div>
       <div class="hint" id="splitSum"></div>
