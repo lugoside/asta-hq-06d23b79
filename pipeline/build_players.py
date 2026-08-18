@@ -160,9 +160,17 @@ def main():
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
         json.dump(players, f, ensure_ascii=False, separators=(",", ":"))
 
+    # data di aggiornamento dichiarata dalla fonte (sidecar dello scraper)
+    fonte_aggiornata = None
+    sm = os.path.join(HERE, "raw", "source_meta.json")
+    if is_reale and os.path.exists(sm):
+        with open(sm, encoding="utf-8") as f:
+            fonte_aggiornata = json.load(f).get("fonteAggiornata")
+
     per_ruolo = {r: sum(1 for p in players if p["ruolo"] == r) for r in ("P", "D", "C", "A")}
     meta = {
         "aggiornato": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fonteAggiornata": fonte_aggiornata,
         "fonte": fonte,
         "isDemo": raw is None,
         "numGiocatori": len(players),

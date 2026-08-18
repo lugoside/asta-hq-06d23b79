@@ -1,13 +1,14 @@
 {
-  "aggiornato": "2026-08-17T16:19:25+00:00",
+  "aggiornato": "2026-08-18T08:21:14+00:00",
+  "fonteAggiornata": "18/08/2026",
   "fonte": "fantacalcio-online.com — listone ufficiale 2026/27",
   "isDemo": false,
-  "numGiocatori": 580,
+  "numGiocatori": 573,
   "perRuolo": {
     "P": 69,
-    "D": 160,
-    "C": 213,
-    "A": 138
+    "D": 155,
+    "C": 215,
+    "A": 134
   },
   "qiScaleCalibrato": 2.5,
   "stagione": "2026/27"

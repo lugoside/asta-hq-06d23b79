@@ -98,10 +98,15 @@ function renderAll() {
 
 function renderDataChip() {
   const chip = document.getElementById("dataChip");
-  const d = META.aggiornato ? new Date(META.aggiornato) : null;
-  const quando = d ? d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—";
-  chip.innerHTML = (META.isDemo ? "⚠ DATI DEMO<br>" : "") + `agg. ${quando}`;
+  const label = META.fonteAggiornata ? `listone ${META.fonteAggiornata}` : `agg. ${fmtScarico()}`;
+  chip.innerHTML = (META.isDemo ? "⚠ DATI DEMO<br>" : "") + label;
   chip.classList.toggle("demo", !!META.isDemo);
+}
+// data/ora dell'ultimo scaricamento (quando è stato generato players.json)
+function fmtScarico() {
+  const d = META.aggiornato ? new Date(META.aggiornato) : null;
+  return d ? d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) + " " +
+    d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
 function renderBudgetBar() {
@@ -229,6 +234,8 @@ function renderImpostazioni() {
   document.getElementById("metaInfo").innerHTML =
     `Stagione <b>${META.stagione || "?"}</b> · ${META.numGiocatori || PLAYERS.length} giocatori · ` +
     (META.isDemo ? "<b style='color:var(--giallo)'>dati DEMO</b>" : "listone reale") +
+    (META.fonteAggiornata ? `<br>📅 Listone aggiornato dalla fonte: <b>${esc(META.fonteAggiornata)}</b>` : "") +
+    `<br>⬇ Ultimo scaricamento: ${fmtScarico()}` +
     `<br>Fonte: ${esc(META.fonte || "—")}`;
 
   const sp = document.getElementById("splitSettings");

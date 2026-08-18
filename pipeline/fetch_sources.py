@@ -50,6 +50,12 @@ def _titlecase_cognome(last: str) -> str:
     return " ".join(w.capitalize() for w in last.split())
 
 
+def parse_data_fonte(html: str) -> str | None:
+    """Estrae la data di aggiornamento dichiarata dalla fonte (es. 'aggiornata al 18/08/2026')."""
+    m = re.search(r'aggiornat[ae]\s+al\s+(\d{1,2}/\d{1,2}/\d{2,4})', html, re.I)
+    return m.group(1) if m else None
+
+
 def parse_listone(html: str) -> list[dict]:
     parts = html.split('class="player-element"')[1:]
     players = []
@@ -97,12 +103,17 @@ def main():
     if len(players) < 300:
         raise SystemExit(f"Solo {len(players)} giocatori estratti: la pagina potrebbe essere cambiata. "
                          f"Controlla pipeline/sources.md.")
+    data_fonte = parse_data_fonte(html)
     os.makedirs(RAW_DIR, exist_ok=True)
     out = os.path.join(RAW_DIR, "listone.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump(players, f, ensure_ascii=False)
+    # sidecar con i metadati della fonte (data di aggiornamento del listone)
+    with open(os.path.join(RAW_DIR, "source_meta.json"), "w", encoding="utf-8") as f:
+        json.dump({"fonteAggiornata": data_fonte, "url": url}, f, ensure_ascii=False)
     from collections import Counter
     print(f"OK: {len(players)} giocatori -> {out}")
+    print(f"Listone aggiornato dalla fonte al: {data_fonte or 'n/d'}")
     print("Per ruolo:", dict(Counter(p["ruolo"] for p in players)))
     top = sorted(players, key=lambda p: -p["qi"])[:6]
     print("Top per valore:", ", ".join(f"{p['nome']}({p['qi']})" for p in top))
