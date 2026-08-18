@@ -21,6 +21,8 @@ const defaultConfig = () => ({
   strappo: DEFAULT_CONFIG.strappo,
   myName: "IO",
   opponents: Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`),
+  adjust: {}, // aggiustamento manuale del valore per giocatore: { playerId: percentuale }
+  notes: {},  // note manuali per giocatore: { playerId: "testo" }
 });
 
 let CONFIG = load(LS.config, defaultConfig());
@@ -222,8 +224,14 @@ async function loadData(forceNetwork = false) {
 // ---------------------------------------------------------------------------
 // Ricalcolo + render
 // ---------------------------------------------------------------------------
+// applica gli aggiustamenti manuali (±%) al valore base prima del calcolo prezzi
+function adjustedPlayers() {
+  const adj = CONFIG.adjust || {};
+  if (!Object.keys(adj).length) return PLAYERS;
+  return PLAYERS.map((p) => adj[p.id] ? { ...p, valoreBase: Math.max(0, p.valoreBase * (1 + adj[p.id] / 100)) } : p);
+}
 function recompute() {
-  BOARD = computeBoard(PLAYERS, PURCHASES, effectiveConfig());
+  BOARD = computeBoard(adjustedPlayers(), PURCHASES, effectiveConfig());
 }
 const boardPlayer = (id) => BOARD?.players.find((p) => p.id === id);
 
@@ -273,6 +281,8 @@ function renderAsta() {
     let semClass, semTxt;
     if (p.taken) { semClass = "giallo"; semTxt = `✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}`; }
     else { const v = offerVerdict(p, offer); semClass = v.cls; semTxt = v.txt; }
+    const adjPct = (CONFIG.adjust && CONFIG.adjust[p.id]) || 0;
+    const pnote = (CONFIG.notes && CONFIG.notes[p.id]) || "";
     card.innerHTML = `
       <div class="top">
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
@@ -287,6 +297,7 @@ function renderAsta() {
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
         <div class="box"><div class="v">${BOARD.me.maxBid}</div><div class="l">tuo max</div></div>
       </div>
+      <div class="srcinfo">📊 Rating ${p.overall ?? "—"} · Bonus attesi ${p.bonusAtteso ?? "—"} · Titolarità ${Math.round((p.titolarita || 0) * 100)}%${adjPct ? ` · <span class="adjv">aggiust. ${adjPct > 0 ? "+" : ""}${adjPct}%</span>` : ""}${pnote ? `<br>📝 ${esc(pnote)}` : ""}</div>
       <div class="semaforo ${semClass}" id="offerSem"><span class="dot"></span>${semTxt}</div>
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">
@@ -295,6 +306,11 @@ function renderAsta() {
         <button class="step" data-step="1">+</button>
       </div>
       ${buyActionsHtml(p)}`}
+      <div class="adjust">
+        <label>🎚️ Aggiusta valore <b>${adjPct > 0 ? "+" : ""}${adjPct}%</b> <span class="hint2">(titolarità, infortuni, mercato…)</span></label>
+        <input type="range" min="-40" max="40" step="5" value="${adjPct}" data-adjust="${p.id}" />
+        <input type="text" class="notein" placeholder="nota (es. rientra dall'infortunio, titolare sicuro…)" data-note="${p.id}" value="${esc(pnote)}" />
+      </div>
     `;
   }
   renderRecent();
@@ -646,6 +662,22 @@ function wire() {
     if (e.target && e.target.id === "priceInput") {
       buyFlow.price = Math.max(1, Math.round(Number(e.target.value) || 1));
       updateOfferSem();
+    }
+  });
+
+  // manopola manuale (aggiustamento ±% e nota) per giocatore
+  document.body.addEventListener("change", (e) => {
+    const t = e.target; if (!t || !t.dataset) return;
+    if (t.dataset.adjust != null) {
+      const pid = t.dataset.adjust, v = Number(t.value) || 0;
+      CONFIG.adjust = CONFIG.adjust || {};
+      if (v === 0) delete CONFIG.adjust[pid]; else CONFIG.adjust[pid] = v;
+      persist(); recompute(); renderAll();
+    } else if (t.dataset.note != null) {
+      const pid = t.dataset.note, v = t.value.trim();
+      CONFIG.notes = CONFIG.notes || {};
+      if (!v) delete CONFIG.notes[pid]; else CONFIG.notes[pid] = v;
+      persist();
     }
   });
 
