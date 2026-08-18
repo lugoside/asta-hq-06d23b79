@@ -6,8 +6,9 @@ import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals } from "./en
 // ---------------------------------------------------------------------------
 const LS = {
   config: "fa_config", purchases: "fa_purchases", fav: "fa_favorites",
-  players: "fa_players_cache", meta: "fa_meta_cache",
+  players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
 };
+const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 
 const defaultConfig = () => ({
@@ -37,6 +38,25 @@ function load(key, fallback) {
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
 function persist() {
   save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
+  scheduleSnapshot();
+}
+
+// --- backup automatico: anello di snapshot con data/ora ---
+let snapTimer;
+function scheduleSnapshot() { clearTimeout(snapTimer); snapTimer = setTimeout(snapshotNow, 700); }
+function snapshotNow() {
+  try {
+    clearTimeout(snapTimer);
+    const hist = load(LS.history, []);
+    const snap = { ts: Date.now(), purchases: PURCHASES, config: CONFIG, favorites: [...FAVORITES] };
+    const last = hist[hist.length - 1];
+    // niente doppioni: salta se identico all'ultimo snapshot
+    if (last && JSON.stringify([last.purchases, last.config, last.favorites]) ===
+                JSON.stringify([snap.purchases, snap.config, snap.favorites])) return;
+    hist.push(snap);
+    while (hist.length > HISTORY_MAX) hist.shift();
+    save(LS.history, hist);
+  } catch {}
 }
 
 // config normalizzata per l'engine (splitPct → budgetSplit che somma 1)
@@ -173,8 +193,8 @@ function renderRecent() {
   const el = document.getElementById("recentList");
   if (!PURCHASES.length) { el.innerHTML = `<div class="row"><span class="meta">Nessun acquisto ancora.</span></div>`; return; }
   el.innerHTML = PURCHASES.slice(-8).reverse().map((pu) => {
-    const pl = PLAYERS.find((x) => x.id === pu.playerId);
-    if (!pl) return "";
+    const pl = PLAYERS.find((x) => x.id === pu.playerId) ||
+               { ruolo: pu.ruolo || "?", nome: pu.nome || pu.playerId };
     const idx = PURCHASES.lastIndexOf(pu);
     return `<div class="row">
       <span class="rp ${pl.ruolo}">${pl.ruolo}</span>
@@ -249,6 +269,39 @@ function renderImpostazioni() {
   document.getElementById("myName").value = CONFIG.myName;
   document.getElementById("oppSettings").innerHTML = CONFIG.opponents.map((o, i) => `
     <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
+  renderBackups();
+}
+
+function renderBackups() {
+  const el = document.getElementById("backupList");
+  const hist = load(LS.history, []);
+  if (!hist.length) { el.innerHTML = `<div class="row"><span class="meta">Nessun backup ancora.</span></div>`; return; }
+  el.innerHTML = hist.map((s, idx) => {
+    const d = new Date(s.ts);
+    const when = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) + " " +
+      d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const n = (s.purchases || []).length;
+    return { idx, html: `<div class="row">
+      <div class="grow"><div class="nome">${when}</div><div class="meta">${n} acquist${n === 1 ? "o" : "i"}</div></div>
+      <button class="btn ghost" data-restore="${idx}" style="padding:8px 12px">Ripristina</button>
+    </div>` };
+  }).reverse().map((r) => r.html).join("");
+}
+
+function restoreBackup(idx) {
+  const hist = load(LS.history, []);
+  const s = hist[idx];
+  if (!s) return;
+  const d = new Date(s.ts);
+  const when = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (!confirm(`Ripristinare il backup delle ${when} (${(s.purchases || []).length} acquisti)?\nLo stato attuale verrà prima salvato tra i backup.`)) return;
+  snapshotNow(); // salva lo stato corrente prima di sovrascrivere
+  PURCHASES = Array.isArray(s.purchases) ? s.purchases.slice() : [];
+  if (s.config) CONFIG = { ...defaultConfig(), ...s.config };
+  if (s.favorites) FAVORITES = new Set(s.favorites);
+  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
+  snapshotNow();
+  recompute(); renderAll(); toast("Backup ripristinato");
 }
 function updateSplitSum() {
   const p = CONFIG.splitPct; const tot = p.P + p.D + p.C + p.A;
@@ -272,8 +325,9 @@ function recordPurchase(team) {
   const p = boardPlayer(selectedId); if (!p) return;
   const input = document.getElementById("priceInput");
   const price = Math.max(1, Math.round(Number(input?.value) || p.prezzoConsigliato));
-  PURCHASES.push({ playerId: selectedId, price, team });
-  persist(); recompute();
+  // salvo anche nome/ruolo/squadra: l'acquisto resta valido anche se il listone cambia
+  PURCHASES.push({ playerId: selectedId, price, team, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra });
+  persist(); snapshotNow(); recompute();
   toast(`${p.nome} → ${teamName(team)} a ${price}`);
   selectedId = null;
   renderAll();
@@ -281,8 +335,8 @@ function recordPurchase(team) {
 function undoPurchaseIdx(idx) {
   if (idx >= 0 && idx < PURCHASES.length) {
     const pu = PURCHASES[idx]; const pl = PLAYERS.find((x) => x.id === pu.playerId);
-    PURCHASES.splice(idx, 1); persist(); recompute();
-    toast(`Annullato: ${pl ? pl.nome : "acquisto"}`);
+    PURCHASES.splice(idx, 1); persist(); snapshotNow(); recompute();
+    toast(`Annullato: ${pl ? pl.nome : (pu.nome || "acquisto")}`);
     renderAll();
   }
 }
@@ -352,6 +406,8 @@ function wire() {
     if (undo) { undoPurchaseByPlayer(undo.dataset.undo); return; }
     const undoidx = e.target.closest("[data-undoidx]");
     if (undoidx) { undoPurchaseIdx(Number(undoidx.dataset.undoidx)); return; }
+    const restore = e.target.closest("[data-restore]");
+    if (restore) { restoreBackup(Number(restore.dataset.restore)); return; }
   });
 
   // filtri listone
@@ -385,8 +441,10 @@ function wire() {
     CONFIG.opponents[Number(i)] = e.target.value || `Avv ${Number(i) + 1}`; persist(); recompute();
   });
   document.getElementById("resetBtn").addEventListener("click", () => {
-    if (confirm("Azzerare tutti gli acquisti dell'asta? (impostazioni e obiettivi restano)")) {
-      PURCHASES = []; selectedId = null; persist(); recompute(); toast("Asta azzerata"); setScreen("asta");
+    if (confirm("Azzerare tutti gli acquisti dell'asta? Lo stato attuale resta tra i backup automatici (potrai ripristinarlo). Impostazioni e obiettivi restano.")) {
+      snapshotNow();                 // salva lo stato pre-reset così è recuperabile
+      PURCHASES = []; selectedId = null; persist(); snapshotNow(); recompute();
+      toast("Asta azzerata (recuperabile dai backup)"); setScreen("asta");
     }
   });
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
@@ -418,7 +476,7 @@ function importBackup(e) {
       if (d.config) CONFIG = { ...defaultConfig(), ...d.config };
       if (d.purchases) PURCHASES = d.purchases;
       if (d.favorites) FAVORITES = new Set(d.favorites);
-      persist(); recompute(); renderAll(); toast("Backup importato");
+      persist(); snapshotNow(); recompute(); renderAll(); toast("Backup importato");
     } catch { toast("File non valido"); }
   };
   reader.readAsText(file);
@@ -430,6 +488,8 @@ function importBackup(e) {
 // ---------------------------------------------------------------------------
 async function init() {
   wire();
+  // chiedi al browser di NON sfrattare i dati salvati (importante durante l'asta)
+  try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch {}
   try { await loadData(false); }
   catch { document.getElementById("calledCard").textContent = "Impossibile caricare i dati."; return; }
   recompute();

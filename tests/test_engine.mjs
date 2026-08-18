@@ -111,5 +111,15 @@ console.log("== Test 7: nessuna spesa negativa, prezzi sempre validi a metà ast
 ok(board2.players.filter((p) => !p.taken).every((p) => p.prezzoConsigliato >= 1), "prezzi validi anche a metà asta");
 ok(board2.me.maxBid >= 0, "maxBid mai negativo");
 
+console.log("== Test 8: acquisto 'blindato' (giocatore non più nel listone) ==");
+// simulo un acquisto di un id sconosciuto ma con ruolo salvato → deve contare comunque
+const purchGhost = [{ playerId: "sconosciuto_x", price: 30, team: MY_TEAM, ruolo: "A", nome: "Tale", squadra: "X" }];
+const bg = computeBoard(players, purchGhost, cfg);
+ok(bg.me.spent === 30 && bg.me.budgetLeft === 470, "acquisto con id ignoto conta sul budget grazie al ruolo salvato");
+ok(bg.me.slotsRemaining.A === 5, "slot attacco scalato anche per giocatore fuori listone");
+// senza ruolo salvato e id ignoto → ignorato (nessun crash)
+const bg2 = computeBoard(players, [{ playerId: "ignoto", price: 10, team: MY_TEAM }], cfg);
+ok(bg2.me.spent === 0, "acquisto ignoto senza ruolo viene ignorato senza errori");
+
 console.log(`\nRisultato: ${passed} passati, ${failed} falliti`);
 process.exit(failed === 0 ? 0 : 1);

@@ -72,15 +72,17 @@ export function computeState(players, purchases, config = DEFAULT_CONFIG) {
 
   for (const pu of purchases) {
     const pl = byId.get(pu.playerId);
-    if (!pl) continue; // acquisto di un giocatore sconosciuto → ignora
+    // se il giocatore non è più nel listone (aggiornato), uso il ruolo salvato nell'acquisto
+    const ruolo = pl ? pl.ruolo : pu.ruolo;
+    if (!ruolo || !ROLES.includes(ruolo)) continue;
     const price = Math.max(1, Math.round(pu.price || 1));
     taken.set(pu.playerId, { price, team: pu.team });
-    spentByRole[pl.ruolo] += price;
-    filledByRole[pl.ruolo] += 1;
+    spentByRole[ruolo] += price;
+    filledByRole[ruolo] += 1;
     const t = ensureTeam(pu.team);
     t.spent += price;
     t.count += 1;
-    t.filledByRole[pl.ruolo] += 1;
+    t.filledByRole[ruolo] += 1;
   }
 
   // arricchisci ogni squadra con budget e slot residui
