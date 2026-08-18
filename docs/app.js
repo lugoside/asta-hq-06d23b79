@@ -32,6 +32,7 @@ let BOARD = null;
 let selectedId = null;
 // flusso di acquisto nella scheda Asta: idle → chooseOpp → confirm
 let buyFlow = { mode: "idle", team: null, price: null };
+let justDragged = false; // per non far scattare un tap subito dopo un drag&drop
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
@@ -380,14 +381,20 @@ function renderSquadre() {
     // giocatori acquistati da questa squadra (con fallback ai dati salvati nell'acquisto)
     const roster = PURCHASES.filter((pu) => pu.team === t.id).map((pu) => {
       const pl = PLAYERS.find((x) => x.id === pu.playerId) || { ruolo: pu.ruolo || "?", nome: pu.nome || pu.playerId };
-      return { ruolo: pl.ruolo, nome: pl.nome, price: pu.price };
+      return { id: pu.playerId, ruolo: pl.ruolo, nome: pl.nome, price: pu.price };
     }).sort((a, b) => ROLES.indexOf(a.ruolo) - ROLES.indexOf(b.ruolo) || b.price - a.price);
     const rosterHtml = open ? `<div class="roster">${
       roster.length
-        ? roster.map((p) => `<div class="rrow"><span class="rp ${p.ruolo}">${p.ruolo}</span><span class="rn">${esc(p.nome)}</span><span class="rprice">${p.price}</span></div>`).join("")
+        ? roster.map((p) => `<div class="rrow">
+            <span class="grip" data-drag="${esc(p.id)}" data-from="${esc(t.id)}" title="Trascina per spostare">⠿</span>
+            <span class="rp ${p.ruolo}">${p.ruolo}</span>
+            <span class="rn">${esc(p.nome)}</span>
+            <span class="rprice">${p.price}</span>
+            <button class="rx" data-remove-purchase="${esc(p.id)}" title="Rimuovi">✕</button>
+          </div>`).join("")
         : `<div class="rempty">Nessun giocatore ancora.</div>`
     }</div>` : "";
-    return `<div class="team">
+    return `<div class="team" data-drop-team="${esc(t.id)}">
       <div class="hd tap" data-team="${esc(t.id)}">
         <span class="nm ${t.isMe ? "me" : ""}">${open ? "▾" : "▸"} ${esc(t.name)}</span>
         <span class="bud">${s.budgetLeft} <small>/ ${CONFIG.budgetPerTeam} · ${s.count} giocatori</small></span>
@@ -509,6 +516,66 @@ function undoPurchaseByPlayer(id) {
   const idx = PURCHASES.map((p) => p.playerId).lastIndexOf(id);
   undoPurchaseIdx(idx);
 }
+function movePurchase(pid, toTeam) {
+  const pu = PURCHASES.find((p) => p.playerId === pid);
+  if (!pu || pu.team === toTeam) return;
+  pu.team = toTeam;
+  persist(); snapshotNow(); recompute(); renderAll();
+  const pl = PLAYERS.find((x) => x.id === pid);
+  toast(`${pl ? pl.nome : "Giocatore"} → ${teamName(toTeam)}`);
+}
+
+// Drag & drop (Pointer Events: funziona con mouse e con dito) per spostare un
+// giocatore tra squadre nella scheda Squadre. Si trascina dalla maniglia ⠿.
+function teamCardAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest("[data-drop-team]") : null;
+}
+function setupTeamDnD() {
+  const list = document.getElementById("teamsList");
+  if (!list) return;
+  let drag = null;
+  const onMove = (e) => {
+    if (!drag) return;
+    if (!drag.moved) {
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 8) return;
+      drag.moved = true; drag.clone.style.display = "block";
+    }
+    e.preventDefault();
+    drag.clone.style.left = e.clientX + "px";
+    drag.clone.style.top = e.clientY + "px";
+    const card = teamCardAt(e.clientX, e.clientY);
+    if (drag.hover && drag.hover !== card) drag.hover.classList.remove("drop-hover");
+    if (card && card.dataset.dropTeam !== drag.from) { card.classList.add("drop-hover"); drag.hover = card; }
+    else drag.hover = null;
+  };
+  const onUp = (e) => {
+    if (!drag) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    drag.clone.remove();
+    if (drag.hover) drag.hover.classList.remove("drop-hover");
+    if (drag.moved) {
+      justDragged = true; setTimeout(() => { justDragged = false; }, 350);
+      const card = teamCardAt(e.clientX, e.clientY);
+      if (card && card.dataset.dropTeam && card.dataset.dropTeam !== drag.from) movePurchase(drag.pid, card.dataset.dropTeam);
+    }
+    drag = null;
+  };
+  list.addEventListener("pointerdown", (e) => {
+    const grip = e.target.closest("[data-drag]");
+    if (!grip) return;
+    e.preventDefault();
+    const clone = document.createElement("div");
+    clone.className = "drag-clone";
+    clone.textContent = grip.parentElement.querySelector(".rn")?.textContent || "•";
+    clone.style.display = "none";
+    document.body.appendChild(clone);
+    drag = { pid: grip.dataset.drag, from: grip.dataset.from, sx: e.clientX, sy: e.clientY, moved: false, clone, hover: null };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+  });
+}
 
 function setScreen(name) {
   ui.screen = name;
@@ -559,6 +626,9 @@ function wire() {
 
   // click delega su tutta la pagina
   document.body.addEventListener("click", (e) => {
+    if (justDragged) return; // ignora il click sintetico dopo un trascinamento
+    const remP = e.target.closest("[data-remove-purchase]");
+    if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
     const pick = e.target.closest("[data-pick]");
     if (pick) { selectPlayer(pick.dataset.pick); return; }
     const fav = e.target.closest("[data-fav]");
@@ -640,6 +710,7 @@ function wire() {
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
   document.getElementById("importFile").addEventListener("change", importBackup);
+  setupTeamDnD();
 }
 
 function toggleFav(id) {

@@ -146,6 +146,13 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
 .team .rrow .rn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .9rem; }
 .team .rrow .rprice { font-weight: 800; color: var(--accent2); }
 .team .rempty { color: var(--muted); font-size: .8rem; padding: 4px 2px; }
+.team .rrow .grip { cursor: grab; touch-action: none; color: var(--muted); font-size: 1.15rem; padding: 0 2px; user-select: none; }
+.team .rrow .grip:active { cursor: grabbing; }
+.team .rrow .rx { background: none; border: none; color: var(--rosso); font-size: 1rem; padding: 4px 6px; flex: none; }
+.team.drop-hover { outline: 2px dashed var(--accent2); outline-offset: -3px; border-radius: 8px; background: rgba(34,197,94,.08); }
+.drag-clone { position: fixed; z-index: 100; transform: translate(-50%, -50%); pointer-events: none;
+  background: var(--accent); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: .85rem; font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5); max-width: 60vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* impostazioni */
 .setting { padding: 12px 0; border-bottom: 1px solid var(--line); }
