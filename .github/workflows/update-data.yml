@@ -31,14 +31,24 @@ jobs:
         run: python pipeline/fetch_sources.py
       - name: Ricostruisci players.json
         run: python pipeline/build_players.py
-      - name: Commit se ci sono variazioni
+      - name: Commit e pubblica (robusto ai race)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data
-          if git diff --cached --quiet; then
-            echo "Nessuna variazione nei dati."
-          else
+          for i in 1 2 3 4 5; do
+            git add docs/data
+            if git diff --cached --quiet; then
+              echo "Nessuna variazione nei dati."; exit 0
+            fi
             git commit -m "chore: aggiorna dati listone [skip ci]"
-            git push
-          fi
+            if git push; then
+              echo "Pubblicato al tentativo $i."; exit 0
+            fi
+            echo "Push rifiutato (remoto avanzato): riallineo e rigenero (tentativo $i)…"
+            git reset --hard HEAD~1
+            git fetch origin main
+            git reset --hard origin/main
+            python pipeline/fetch_sources.py
+            python pipeline/build_players.py
+          done
+          echo "Impossibile pubblicare dopo 5 tentativi."; exit 1
