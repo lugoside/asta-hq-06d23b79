@@ -30,7 +30,7 @@ let PLAYERS = [];
 let META = {};
 let BOARD = null;
 let selectedId = null;
-const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "" };
+const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
 let SYNC = load(LS.sync, { url: "", code: "", on: false });
@@ -349,13 +349,25 @@ function renderSquadre() {
   el.innerHTML = teamList().map((t) => {
     const s = byId.get(t.id) || { budgetLeft: CONFIG.budgetPerTeam, spent: 0, slotsRemaining: { ...CONFIG.roster }, count: 0 };
     const pct = Math.max(0, Math.min(100, (s.budgetLeft / CONFIG.budgetPerTeam) * 100));
+    const open = ui.expandedTeams.has(t.id);
+    // giocatori acquistati da questa squadra (con fallback ai dati salvati nell'acquisto)
+    const roster = PURCHASES.filter((pu) => pu.team === t.id).map((pu) => {
+      const pl = PLAYERS.find((x) => x.id === pu.playerId) || { ruolo: pu.ruolo || "?", nome: pu.nome || pu.playerId };
+      return { ruolo: pl.ruolo, nome: pl.nome, price: pu.price };
+    }).sort((a, b) => ROLES.indexOf(a.ruolo) - ROLES.indexOf(b.ruolo) || b.price - a.price);
+    const rosterHtml = open ? `<div class="roster">${
+      roster.length
+        ? roster.map((p) => `<div class="rrow"><span class="rp ${p.ruolo}">${p.ruolo}</span><span class="rn">${esc(p.nome)}</span><span class="rprice">${p.price}</span></div>`).join("")
+        : `<div class="rempty">Nessun giocatore ancora.</div>`
+    }</div>` : "";
     return `<div class="team">
-      <div class="hd">
-        <span class="nm ${t.isMe ? "me" : ""}">${esc(t.name)}</span>
+      <div class="hd tap" data-team="${esc(t.id)}">
+        <span class="nm ${t.isMe ? "me" : ""}">${open ? "▾" : "▸"} ${esc(t.name)}</span>
         <span class="bud">${s.budgetLeft} <small>/ ${CONFIG.budgetPerTeam} · ${s.count} giocatori</small></span>
       </div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="slotline">${ROLES.map((r) => `<span class="slot ${r}">${r} ${s.slotsRemaining[r]}</span>`).join("")}</div>
+      ${rosterHtml}
     </div>`;
   }).join("");
 }
@@ -532,6 +544,12 @@ function wire() {
     if (undoidx) { undoPurchaseIdx(Number(undoidx.dataset.undoidx)); return; }
     const restore = e.target.closest("[data-restore]");
     if (restore) { restoreBackup(Number(restore.dataset.restore)); return; }
+    const teamTog = e.target.closest("[data-team]");
+    if (teamTog) {
+      const id = teamTog.dataset.team;
+      if (ui.expandedTeams.has(id)) ui.expandedTeams.delete(id); else ui.expandedTeams.add(id);
+      renderSquadre(); return;
+    }
   });
 
   // filtri listone

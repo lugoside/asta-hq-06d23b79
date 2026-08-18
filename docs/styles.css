@@ -134,6 +134,13 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
 .bar { height: 6px; background: var(--card2); border-radius: 4px; margin: 8px 0; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); }
 .team .slotline { font-size: .74rem; color: var(--muted); display: flex; gap: 10px; }
+.team .hd.tap { cursor: pointer; user-select: none; }
+.team .hd.tap:active { opacity: .7; }
+.team .roster { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 4px; }
+.team .rrow { display: flex; align-items: center; gap: 8px; padding: 5px 2px; }
+.team .rrow .rn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .9rem; }
+.team .rrow .rprice { font-weight: 800; color: var(--accent2); }
+.team .rempty { color: var(--muted); font-size: .8rem; padding: 4px 2px; }
 
 /* impostazioni */
 .setting { padding: 12px 0; border-bottom: 1px solid var(--line); }
