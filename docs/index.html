@@ -107,6 +107,13 @@
       <button class="btn me full" id="syncToggle">▶ Attiva sincronizzazione</button>
       <div class="hint" id="syncStatus" style="margin-top:8px"></div>
 
+      <div class="section-title">La lega</div>
+      <div class="setting">
+        <label>Numero di squadre <span class="val" id="numTeamsVal">10</span></label>
+        <input type="range" min="8" max="12" step="1" id="numTeams" value="10" />
+        <div class="hint">Da 8 a 12. Ricalcola budget totale, slot e prezzi consigliati.</div>
+      </div>
+
       <div class="section-title">Ripartizione budget per ruolo</div>
       <div id="splitSettings"></div>
       <div class="hint" id="splitSum"></div>

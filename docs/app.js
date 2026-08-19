@@ -197,6 +197,17 @@ function effectiveConfig() {
   };
 }
 
+// cambia il numero di squadre (8..12): ridimensiona gli avversari e ricalcola tutto
+function setNumTeams(n) {
+  n = Math.max(8, Math.min(12, Math.round(n) || 10));
+  CONFIG.numTeams = n;
+  const need = n - 1;
+  const cur = CONFIG.opponents.slice(0, need);
+  while (cur.length < need) cur.push(`Avv ${cur.length + 1}`);
+  CONFIG.opponents = cur;
+  persist(); recompute(); renderAll();
+}
+
 function teamList() {
   return [
     { id: MY_TEAM, name: CONFIG.myName || "IO", isMe: true },
@@ -462,6 +473,8 @@ function renderImpostazioni() {
     </div>`).join("");
   updateSplitSum();
 
+  const nt = document.getElementById("numTeams");
+  if (nt) { nt.value = CONFIG.numTeams; document.getElementById("numTeamsVal").textContent = CONFIG.numTeams; }
   document.getElementById("myName").value = CONFIG.myName;
   document.getElementById("oppSettings").innerHTML = CONFIG.opponents.map((o, i) => `
     <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
@@ -763,6 +776,8 @@ function wire() {
     document.getElementById("splitVal" + r).textContent = CONFIG.splitPct[r] + "%";
     updateSplitSum(); persist(); recompute();
   });
+  document.getElementById("numTeams").addEventListener("input", (e) => { document.getElementById("numTeamsVal").textContent = e.target.value; });
+  document.getElementById("numTeams").addEventListener("change", (e) => setNumTeams(Number(e.target.value)));
   document.getElementById("myName").addEventListener("change", (e) => { CONFIG.myName = e.target.value || "IO"; persist(); renderAll(); });
   document.getElementById("oppSettings").addEventListener("change", (e) => {
     const i = e.target.dataset.opp; if (i == null) return;
