@@ -112,30 +112,33 @@
       <button class="btn me full" id="syncToggle">▶ Attiva sincronizzazione</button>
       <div class="hint" id="syncStatus" style="margin-top:8px"></div>
 
-      <div class="section-title">La lega</div>
+      <div class="section-title">🌐 Configurazione di lega <span class="cfg-tag shared">condivisa</span></div>
+      <div class="hint" style="margin-bottom:2px">Valgono per l'intera lega: modificandole qui, si aggiornano su <b>tutti i dispositivi</b> collegati allo stesso Codice Lega.</div>
       <div class="setting">
         <label>Numero di squadre</label>
         <div id="numTeamsStepper"></div>
-        <div class="hint">Da 8 a 12. Ricalcola budget totale, slot e prezzi consigliati.</div>
+        <div class="hint">Da 8 a 12. Ricalcola budget totale, slot e prezzi.</div>
       </div>
       <div class="setting">
         <label>Crediti per squadra</label>
         <input id="budgetPerTeam" type="number" inputmode="numeric" min="1" value="500" />
-        <div class="hint">Il budget di ogni squadra (default 500). Ricalcola i prezzi consigliati.</div>
+        <div class="hint">Il budget di ogni squadra (default 500).</div>
       </div>
-
-      <div class="section-title">Ripartizione budget per ruolo</div>
-      <div id="splitSettings"></div>
-      <div class="hint" id="splitSum"></div>
-
-      <div class="section-title">La mia squadra</div>
-      <div class="setting">
-        <label>Nome</label>
+      <div class="sublabel">Slot rosa per squadra <span class="hint" style="font-weight:400">(giocatori per ruolo)</span></div>
+      <div id="rosterSettings"></div>
+      <div class="hint" id="rosterSum"></div>
+      <div class="setting" style="margin-top:6px">
+        <label>La tua squadra (nome)</label>
         <input id="myName" type="text" placeholder="IO" />
       </div>
-
-      <div class="section-title">Avversari</div>
+      <div class="sublabel">Le altre squadre della lega</div>
       <div id="oppSettings"></div>
+
+      <div class="section-title">👤 Le mie preferenze <span class="cfg-tag local">solo tue</span></div>
+      <div class="hint" style="margin-bottom:2px">Non condivise: influenzano solo i <b>tuoi</b> prezzi consigliati, restano su questo dispositivo.</div>
+      <div class="sublabel">Ripartizione budget per ruolo</div>
+      <div id="splitSettings"></div>
+      <div class="hint" id="splitSum"></div>
 
       <div class="section-title">Backup automatici</div>
       <div class="hint" style="margin-bottom:8px">Ogni azione viene salvata in automatico. Se qualcosa va storto, ripristina un momento precedente (lo stato attuale verrà comunque salvato prima).</div>

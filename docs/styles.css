@@ -212,6 +212,13 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 .an-note { background: var(--card2); border-radius: 10px; padding: 9px 12px; font-size: .82rem; color: var(--muted); margin-bottom: 12px; }
 .an-note b { font-size: .95rem; }
 
+/* config di lega: etichette condiviso/personale + sotto-etichette */
+.cfg-tag { font-size: .6rem; font-weight: 700; border-radius: 20px; padding: 2px 8px;
+  margin-left: 8px; text-transform: none; letter-spacing: 0; vertical-align: middle; }
+.cfg-tag.shared { color: #0b1220; background: var(--accent2); }
+.cfg-tag.local { color: var(--muted); border: 1px solid var(--line); }
+.sublabel { font-size: .82rem; color: var(--text); font-weight: 600; margin: 14px 0 2px; }
+
 /* bottom nav */
 nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; z-index: 40;
   background: var(--bg2); border-top: 1px solid var(--line); }

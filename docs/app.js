@@ -53,8 +53,9 @@ let DEVICE_ID = load(LS.device, "");
 if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
 let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _configTimer = null, _seeded = false;
 
-// campi di CONFIG condivisi via cloud (gli altri, come adjust/notes, restano personali)
-const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "splitPct", "concentration", "strappo", "myName", "opponents"];
+// Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
+// Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "myName", "opponents"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -325,6 +326,11 @@ function applyStep(target, d) {
   if (target.startsWith("split:")) {
     const r = target.slice(6);
     CONFIG.splitPct[r] = Math.max(0, Math.min(90, (CONFIG.splitPct[r] || 0) + d));
+    persist(); recompute(); renderAll(); return;
+  }
+  if (target.startsWith("roster:")) { // slot rosa per ruolo: config di LEGA (condivisa)
+    const r = target.slice(7);
+    CONFIG.roster = { ...CONFIG.roster, [r]: Math.max(0, Math.min(20, (CONFIG.roster[r] || 0) + d)) };
     persist(); recompute(); renderAll(); return;
   }
   if (target === "adjust") {
@@ -750,6 +756,13 @@ function renderImpostazioni() {
     `<br>Fonte: ${esc(META.fonte || "—")}`;
 
   document.getElementById("numTeamsStepper").innerHTML = stepper("numTeams", CONFIG.numTeams + " squadre", 1);
+  const rs = document.getElementById("rosterSettings");
+  if (rs) rs.innerHTML = ROLES.map((r) => `
+    <div class="setting stepper-row">
+      <label>${RUOLO_NOME[r]}</label>
+      ${stepper("roster:" + r, (CONFIG.roster[r] ?? 0) + "", 1)}
+    </div>`).join("");
+  updateRosterSum();
   const sp = document.getElementById("splitSettings");
   sp.innerHTML = ROLES.map((r) => `
     <div class="setting stepper-row">
@@ -826,6 +839,12 @@ function restoreBackup(idx) {
   applyPurchasesTarget(Array.isArray(s.purchases) ? s.purchases : []); // riallinea via mosse (anche sul cloud)
   snapshotNow();
   recompute(); renderAll(); toast("Backup ripristinato");
+}
+function updateRosterSum() {
+  const el = document.getElementById("rosterSum"); if (!el) return;
+  const r = CONFIG.roster;
+  const tot = ROLES.reduce((a, x) => a + (r[x] || 0), 0);
+  el.textContent = `Totale ${tot} giocatori a squadra · ` + ROLES.map((x) => `${r[x] || 0}${x}`).join(" ");
 }
 function updateSplitSum() {
   const p = CONFIG.splitPct; const tot = p.P + p.D + p.C + p.A;
