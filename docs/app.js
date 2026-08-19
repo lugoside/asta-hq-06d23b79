@@ -208,6 +208,29 @@ function setNumTeams(n) {
   persist(); recompute(); renderAll();
 }
 
+// stepper touch-safe (− valore +) al posto delle barre range
+function stepper(target, label, step) {
+  return `<div class="stepper">` +
+    `<button class="stepbtn" data-sd="${target}" data-dd="${-step}">−</button>` +
+    `<span class="sv">${label}</span>` +
+    `<button class="stepbtn" data-sd="${target}" data-dd="${step}">+</button></div>`;
+}
+function applyStep(target, d) {
+  if (target === "numTeams") { setNumTeams(CONFIG.numTeams + d); return; }
+  if (target.startsWith("split:")) {
+    const r = target.slice(6);
+    CONFIG.splitPct[r] = Math.max(0, Math.min(90, (CONFIG.splitPct[r] || 0) + d));
+    persist(); recompute(); renderAll(); return;
+  }
+  if (target === "adjust") {
+    if (!selectedId) return;
+    CONFIG.adjust = CONFIG.adjust || {};
+    const v = Math.max(-40, Math.min(40, (CONFIG.adjust[selectedId] || 0) + d));
+    if (v === 0) delete CONFIG.adjust[selectedId]; else CONFIG.adjust[selectedId] = v;
+    persist(); recompute(); renderAll(); return;
+  }
+}
+
 function teamList() {
   return [
     { id: MY_TEAM, name: CONFIG.myName || "IO", isMe: true },
@@ -321,8 +344,8 @@ function renderAsta() {
       </div>
       ${buyActionsHtml(p)}`}
       <div class="adjust">
-        <label>🎚️ Aggiusta valore <b>${adjPct > 0 ? "+" : ""}${adjPct}%</b> <span class="hint2">(titolarità, infortuni, mercato…)</span></label>
-        <input type="range" min="-40" max="40" step="5" value="${adjPct}" data-adjust="${p.id}" />
+        <label>🎚️ Aggiusta valore <span class="hint2">(titolarità, infortuni, mercato…)</span></label>
+        ${stepper("adjust", (adjPct > 0 ? "+" : "") + adjPct + "%", 5)}
         <input type="text" class="notein" placeholder="nota (es. rientra dall'infortunio, titolare sicuro…)" data-note="${p.id}" value="${esc(pnote)}" />
       </div>
     `;
@@ -465,16 +488,15 @@ function renderImpostazioni() {
     `<br>⬇ Ultimo scaricamento: ${fmtScarico()}` +
     `<br>Fonte: ${esc(META.fonte || "—")}`;
 
+  document.getElementById("numTeamsStepper").innerHTML = stepper("numTeams", CONFIG.numTeams + " squadre", 1);
   const sp = document.getElementById("splitSettings");
   sp.innerHTML = ROLES.map((r) => `
-    <div class="setting">
-      <label>${RUOLO_NOME[r]} <span class="val" id="splitVal${r}">${CONFIG.splitPct[r]}%</span></label>
-      <input type="range" min="0" max="70" value="${CONFIG.splitPct[r]}" data-split="${r}" />
+    <div class="setting stepper-row">
+      <label>${RUOLO_NOME[r]}</label>
+      ${stepper("split:" + r, CONFIG.splitPct[r] + "%", 1)}
     </div>`).join("");
   updateSplitSum();
 
-  const nt = document.getElementById("numTeams");
-  if (nt) { nt.value = CONFIG.numTeams; document.getElementById("numTeamsVal").textContent = CONFIG.numTeams; }
   const bt = document.getElementById("budgetPerTeam");
   if (bt && document.activeElement !== bt) bt.value = CONFIG.budgetPerTeam;
   document.getElementById("myName").value = CONFIG.myName;
@@ -723,6 +745,8 @@ function wire() {
   // click delega su tutta la pagina
   document.body.addEventListener("click", (e) => {
     if (justDragged) return; // ignora il click sintetico dopo un trascinamento
+    const sd = e.target.closest("[data-sd]");
+    if (sd) { applyStep(sd.dataset.sd, Number(sd.dataset.dd)); return; }
     const remP = e.target.closest("[data-remove-purchase]");
     if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
     const pick = e.target.closest("[data-pick]");
@@ -772,14 +796,6 @@ function wire() {
     catch { toast("Aggiornamento fallito"); }
     e.target.textContent = "🔄 Aggiorna dati"; renderAll();
   });
-  document.getElementById("splitSettings").addEventListener("input", (e) => {
-    const r = e.target.dataset.split; if (!r) return;
-    CONFIG.splitPct[r] = Number(e.target.value);
-    document.getElementById("splitVal" + r).textContent = CONFIG.splitPct[r] + "%";
-    updateSplitSum(); persist(); recompute();
-  });
-  document.getElementById("numTeams").addEventListener("input", (e) => { document.getElementById("numTeamsVal").textContent = e.target.value; });
-  document.getElementById("numTeams").addEventListener("change", (e) => setNumTeams(Number(e.target.value)));
   document.getElementById("budgetPerTeam").addEventListener("change", (e) => {
     const v = Math.round(Number(e.target.value));
     if (!v || v < 1) { e.target.value = CONFIG.budgetPerTeam; return; } // valore non valido → ripristina

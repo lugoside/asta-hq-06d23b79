@@ -96,8 +96,16 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
 .adjust { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .adjust label { display: block; font-size: .82rem; color: var(--text); margin-bottom: 6px; }
 .adjust label .hint2 { color: var(--muted); font-weight: 400; font-size: .74rem; }
-.adjust input[type=range] { width: 100%; }
-.adjust .notein { width: 100%; margin-top: 8px; padding: 9px 12px; font-size: .9rem; }
+.adjust .notein { width: 100%; margin-top: 10px; padding: 9px 12px; font-size: .9rem; }
+
+/* stepper − valore + (sostituisce le barre range, sicuro su touch) */
+.stepper { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.stepper .stepbtn { width: 52px; height: 42px; font-size: 1.4rem; line-height: 1;
+  background: var(--card2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); flex: none; }
+.stepper .stepbtn:active { transform: scale(.95); background: var(--card); }
+.stepper .sv { min-width: 92px; text-align: center; font-weight: 700; font-size: 1rem; }
+.stepper-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stepper-row label { margin: 0; }
 
 .buy-row { display: flex; gap: 8px; align-items: stretch; }
 .buy-row input { flex: 1; text-align: center; font-size: 1.3rem; font-weight: 700; }
