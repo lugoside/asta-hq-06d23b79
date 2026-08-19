@@ -10,6 +10,7 @@ const LS = {
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
 };
+const APP_VERSION = "v30"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -785,7 +786,8 @@ function renderImpostazioni() {
     (META.numFormazioni != null ? `<br>📋 Formazioni (titolari/ballottaggi/riserve): <b>${META.numFormazioni}</b>` : "") +
     (META.numRigoristi != null ? `<br>⚽ Rigoristi: <b>${META.numRigoristi}</b>${META.numPunizioni != null ? ` · 🎯 Punizioni: <b>${META.numPunizioni}</b>` : ""}${META.numCorner != null ? ` · 🚩 Corner: <b>${META.numCorner}</b>` : ""}` : "") +
     `<br>⬇ Ultimo scaricamento: ${fmtScarico()}` +
-    `<br>Fonte: ${esc(META.fonte || "—")}`;
+    `<br>Fonte: ${esc(META.fonte || "—")}` +
+    `<br><span style="opacity:.55">app ${APP_VERSION}</span>`;
 
   const at = document.getElementById("auctionToggle");
   if (at) {
