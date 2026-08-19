@@ -475,6 +475,8 @@ function renderImpostazioni() {
 
   const nt = document.getElementById("numTeams");
   if (nt) { nt.value = CONFIG.numTeams; document.getElementById("numTeamsVal").textContent = CONFIG.numTeams; }
+  const bt = document.getElementById("budgetPerTeam");
+  if (bt && document.activeElement !== bt) bt.value = CONFIG.budgetPerTeam;
   document.getElementById("myName").value = CONFIG.myName;
   document.getElementById("oppSettings").innerHTML = CONFIG.opponents.map((o, i) => `
     <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
@@ -778,6 +780,11 @@ function wire() {
   });
   document.getElementById("numTeams").addEventListener("input", (e) => { document.getElementById("numTeamsVal").textContent = e.target.value; });
   document.getElementById("numTeams").addEventListener("change", (e) => setNumTeams(Number(e.target.value)));
+  document.getElementById("budgetPerTeam").addEventListener("change", (e) => {
+    const v = Math.round(Number(e.target.value));
+    if (!v || v < 1) { e.target.value = CONFIG.budgetPerTeam; return; } // valore non valido → ripristina
+    CONFIG.budgetPerTeam = v; persist(); recompute(); renderAll();
+  });
   document.getElementById("myName").addEventListener("change", (e) => { CONFIG.myName = e.target.value || "IO"; persist(); renderAll(); });
   document.getElementById("oppSettings").addEventListener("change", (e) => {
     const i = e.target.dataset.opp; if (i == null) return;

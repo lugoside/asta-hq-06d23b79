@@ -113,6 +113,11 @@
         <input type="range" min="8" max="12" step="1" id="numTeams" value="10" />
         <div class="hint">Da 8 a 12. Ricalcola budget totale, slot e prezzi consigliati.</div>
       </div>
+      <div class="setting">
+        <label>Crediti per squadra</label>
+        <input id="budgetPerTeam" type="number" inputmode="numeric" min="1" value="500" />
+        <div class="hint">Il budget di ogni squadra (default 500). Ricalcola i prezzi consigliati.</div>
+      </div>
 
       <div class="section-title">Ripartizione budget per ruolo</div>
       <div id="splitSettings"></div>
