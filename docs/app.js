@@ -234,8 +234,12 @@ async function reconcileSync() {
     // 1) config: se il cloud ce l'ha, è la verità condivisa → adotta; se è vuota e ho una
     //    config non-default, la semino io (app piena = proprietaria della lega).
     const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json();
-    if (rc && typeof rc === "object") { if (adoptConfig(rc)) { recompute(); renderAll(); } }
-    else if (haveLocalConfig()) await pushConfig();
+    if (rc && typeof rc === "object") {
+      if (adoptConfig(rc)) { recompute(); renderAll(); }
+      // se il cloud ha una config di vecchio formato (senza teams[]), la aggiorno al nuovo
+      // schema così la LITE legge l'elenco squadre senza interventi manuali.
+      if (!Array.isArray(rc.teams) && Array.isArray(CONFIG.teams) && CONFIG.teams.length) await pushConfig();
+    } else if (haveLocalConfig()) await pushConfig();
 
     // 2) mosse: se il log remoto è vuoto e non ho ancora mosse locali, migro dai vecchi acquisti.
     const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
