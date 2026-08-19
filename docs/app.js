@@ -22,13 +22,36 @@ const defaultConfig = () => ({
   splitPct: { P: 8, D: 14, C: 28, A: 50 },
   concentration: DEFAULT_CONFIG.concentration,
   strappo: DEFAULT_CONFIG.strappo,
-  myName: "IO",
-  opponents: Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`),
+  // teams = elenco COMPLETO dei nomi squadra (config di LEGA, condivisa/admin).
+  // myTeam = quale squadra sono IO (scelta LOCALE, non condivisa).
+  teams: ["IO", ...Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`)],
+  myTeam: "IO",
   adjust: {}, // aggiustamento manuale del valore per giocatore: { playerId: percentuale }
   notes: {},  // note manuali per giocatore: { playerId: "testo" }
 });
 
-let CONFIG = load(LS.config, defaultConfig());
+// Normalizza la config: migra il vecchio modello (myName+opponents) al nuovo
+// (teams[]+myTeam), mantiene numTeams coerente con teams.length e myTeam valido.
+function normalizeConfig(c) {
+  c = c || {};
+  if (!Array.isArray(c.teams)) {                       // migrazione dal vecchio schema
+    const me = c.myName || "IO";
+    const opp = Array.isArray(c.opponents) ? c.opponents : [];
+    c.teams = [me, ...opp];
+    if (!c.myTeam) c.myTeam = me;
+  }
+  const n = Math.max(2, Math.round(c.numTeams || c.teams.length || 10));
+  if (c.teams.length !== n) {                           // allinea la lista al numero squadre
+    c.teams = c.teams.slice(0, n);
+    while (c.teams.length < n) c.teams.push(`Avv ${c.teams.length}`);
+  }
+  c.numTeams = c.teams.length;
+  if (!c.myTeam || !c.teams.includes(c.myTeam)) c.myTeam = c.teams[0]; // "io" deve esistere
+  delete c.myName; delete c.opponents;                 // via i campi obsoleti
+  return c;
+}
+
+let CONFIG = normalizeConfig(load(LS.config, defaultConfig()));
 let MOVES = load(LS.moves, []);            // log append-only (fonte di verità degli acquisti)
 let PURCHASES = [];                         // derivato: reduceMoves(MOVES) con team ricondotti al locale
 let FAVORITES = new Set(load(LS.fav, []));  // preferiti: SOLO locali (personali, non condivisi)
@@ -55,7 +78,7 @@ let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _con
 
 // Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
 // Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
-const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "myName", "opponents"];
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -128,8 +151,8 @@ function mkUid() {
          Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 // nome-squadra condiviso ⇄ id locale (MY_TEAM per la mia squadra; gli avversari sono già nomi)
-function sharedTeamToLocal(name) { return name != null && name === (CONFIG.myName || "IO") ? MY_TEAM : name; }
-function localTeamToShared(id)   { return id === MY_TEAM ? (CONFIG.myName || "IO") : id; }
+function sharedTeamToLocal(name) { return name != null && name === CONFIG.myTeam ? MY_TEAM : name; }
+function localTeamToShared(id)   { return id === MY_TEAM ? CONFIG.myTeam : id; }
 
 function haveLocalConfig() {
   const d = defaultConfig();
@@ -200,7 +223,7 @@ function adoptConfig(remote) {
   for (const k of SHARED_CONFIG_KEYS) {
     if (remote[k] !== undefined && JSON.stringify(remote[k]) !== JSON.stringify(CONFIG[k])) { CONFIG[k] = remote[k]; changed = true; }
   }
-  if (changed) { save(LS.config, CONFIG); rebuildPurchases(); } // myName può cambiare → rimappa team↔MY_TEAM
+  if (changed) { normalizeConfig(CONFIG); save(LS.config, CONFIG); rebuildPurchases(); } // teams può cambiare → myTeam valido + rimappa
   return changed;
 }
 
@@ -307,10 +330,10 @@ function effectiveConfig() {
 function setNumTeams(n) {
   n = Math.max(8, Math.min(12, Math.round(n) || 10));
   CONFIG.numTeams = n;
-  const need = n - 1;
-  const cur = CONFIG.opponents.slice(0, need);
-  while (cur.length < need) cur.push(`Avv ${cur.length + 1}`);
-  CONFIG.opponents = cur;
+  const cur = CONFIG.teams.slice(0, n);
+  while (cur.length < n) cur.push(`Avv ${cur.length}`);
+  CONFIG.teams = cur;
+  if (!CONFIG.teams.includes(CONFIG.myTeam)) CONFIG.myTeam = CONFIG.teams[0];
   persist(); recompute(); renderAll();
 }
 
@@ -343,10 +366,11 @@ function applyStep(target, d) {
 }
 
 function teamList() {
-  return [
-    { id: MY_TEAM, name: CONFIG.myName || "IO", isMe: true },
-    ...CONFIG.opponents.map((n) => ({ id: n, name: n, isMe: false })),
-  ];
+  return CONFIG.teams.map((name) => ({
+    id: name === CONFIG.myTeam ? MY_TEAM : name,
+    name,
+    isMe: name === CONFIG.myTeam,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +513,7 @@ function updateOfferSem() {
 function buyActionsHtml(p) {
   if (buyFlow.mode === "chooseOpp") {
     return `<div class="flow-title">A quale squadra è andato?</div>
-      <div class="opp-grid">${CONFIG.opponents.map((o) => `<button class="btn opp" data-oppteam="${esc(o)}">${esc(o)}</button>`).join("")}</div>
+      <div class="opp-grid">${CONFIG.teams.filter((o) => o !== CONFIG.myTeam).map((o) => `<button class="btn opp" data-oppteam="${esc(o)}">${esc(o)}</button>`).join("")}</div>
       <button class="btn ghost full" data-flow="idle" style="margin-top:8px">← indietro</button>`;
   }
   if (buyFlow.mode === "confirm") {
@@ -501,7 +525,7 @@ function buyActionsHtml(p) {
       </div>`;
   }
   return `<div class="buy-actions">
-      <button class="btn me" data-buy="me">✓ Preso da ${esc(CONFIG.myName || "IO")}</button>
+      <button class="btn me" data-buy="me">✓ Preso da ${esc(CONFIG.myTeam)}</button>
       <button class="btn opp" data-flow="chooseOpp">Preso da avversario →</button>
     </div>`;
 }
@@ -773,9 +797,14 @@ function renderImpostazioni() {
 
   const bt = document.getElementById("budgetPerTeam");
   if (bt && document.activeElement !== bt) bt.value = CONFIG.budgetPerTeam;
-  document.getElementById("myName").value = CONFIG.myName;
-  document.getElementById("oppSettings").innerHTML = CONFIG.opponents.map((o, i) => `
-    <div class="setting" style="padding:6px 0"><input type="text" data-opp="${i}" value="${esc(o)}" /></div>`).join("");
+  const ts = document.getElementById("teamsSettings");
+  if (ts) ts.innerHTML = CONFIG.teams.map((name, i) => {
+    const me = name === CONFIG.myTeam;
+    return `<div class="teamrow ${me ? "me" : ""}">
+      <button class="teammark ${me ? "on" : ""}" data-myteam="${i}" title="Segna come la mia squadra">${me ? "⭐" : "☆"}</button>
+      <input type="text" data-teamname="${i}" value="${esc(name)}" />
+    </div>`;
+  }).join("");
   renderBackups();
   renderSync();
   renderSourcesInfo();
@@ -832,9 +861,9 @@ function restoreBackup(idx) {
   if (!s) return;
   const d = new Date(s.ts);
   const when = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  if (!confirm(`Ripristinare il backup delle ${when} (${(s.purchases || []).length} acquisti)?\nLo stato attuale verrà prima salvato tra i backup.`)) return;
+  if (!confirm(`Ripristinare il backup delle ${when} (${(s.purchases || []).length} acquisti)?\n⚠️ Riscrive l'asta di TUTTA la lega (sincronizzata su tutti i dispositivi). Lo stato attuale verrà prima salvato nei backup.`)) return;
   snapshotNow(); // salva lo stato corrente prima di sovrascrivere
-  if (s.config) { CONFIG = { ...defaultConfig(), ...s.config }; persist(); }
+  if (s.config) { CONFIG = normalizeConfig({ ...defaultConfig(), ...s.config }); persist(); }
   if (s.favorites) { FAVORITES = new Set(s.favorites); save(LS.fav, [...FAVORITES]); }
   applyPurchasesTarget(Array.isArray(s.purchases) ? s.purchases : []); // riallinea via mosse (anche sul cloud)
   snapshotNow();
@@ -957,7 +986,7 @@ function setScreen(name) {
 }
 
 function teamName(id) {
-  if (id === MY_TEAM) return CONFIG.myName || "IO";
+  if (id === MY_TEAM) return CONFIG.myTeam;
   return id;
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -1079,13 +1108,21 @@ function wire() {
     if (!v || v < 1) { e.target.value = CONFIG.budgetPerTeam; return; } // valore non valido → ripristina
     CONFIG.budgetPerTeam = v; persist(); recompute(); renderAll();
   });
-  document.getElementById("myName").addEventListener("change", (e) => { CONFIG.myName = e.target.value || "IO"; persist(); renderAll(); });
-  document.getElementById("oppSettings").addEventListener("change", (e) => {
-    const i = e.target.dataset.opp; if (i == null) return;
-    CONFIG.opponents[Number(i)] = e.target.value || `Avv ${Number(i) + 1}`; persist(); recompute();
+  document.getElementById("teamsSettings").addEventListener("change", (e) => {
+    const i = e.target.dataset.teamname; if (i == null) return;
+    const idx = Number(i), old = CONFIG.teams[idx];
+    const val = e.target.value.trim() || `Avv ${idx}`;
+    if (CONFIG.myTeam === old) CONFIG.myTeam = val; // rinomino la MIA squadra → seguo il nuovo nome
+    CONFIG.teams[idx] = val;
+    persist(); recompute(); renderAll();
+  });
+  document.getElementById("teamsSettings").addEventListener("click", (e) => {
+    const mk = e.target.closest("[data-myteam]"); if (!mk) return;
+    CONFIG.myTeam = CONFIG.teams[Number(mk.dataset.myteam)]; // scelta LOCALE (non condivisa sul cloud)
+    save(LS.config, CONFIG); rebuildPurchases(); recompute(); renderAll();
   });
   document.getElementById("resetBtn").addEventListener("click", () => {
-    if (confirm("Azzerare tutti gli acquisti dell'asta? Lo stato attuale resta tra i backup automatici (potrai ripristinarlo). Impostazioni e obiettivi restano.")) {
+    if (confirm("⚠️ Azzerare l'asta cancella gli acquisti di TUTTA la lega (sincronizzati su tutti i dispositivi), non solo i tuoi. Lo stato attuale resta nei backup automatici. Impostazioni e obiettivi restano. Procedere?")) {
       snapshotNow();                 // salva lo stato pre-reset così è recuperabile
       applyPurchasesTarget([]);       // emette gli undo di tutti gli acquisti presenti (anche sul cloud)
       selectedId = null; snapshotNow(); recompute();
@@ -1133,7 +1170,7 @@ function importBackup(e) {
   reader.onload = () => {
     try {
       const d = JSON.parse(reader.result);
-      if (d.config) { CONFIG = { ...defaultConfig(), ...d.config }; persist(); }
+      if (d.config) { CONFIG = normalizeConfig({ ...defaultConfig(), ...d.config }); persist(); }
       if (d.favorites) { FAVORITES = new Set(d.favorites); save(LS.fav, [...FAVORITES]); }
       if (d.purchases) applyPurchasesTarget(d.purchases); // riallinea via mosse (fonde con l'asta condivisa)
       snapshotNow(); recompute(); renderAll(); toast("Backup importato");

@@ -218,6 +218,11 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 .cfg-tag.shared { color: #0b1220; background: var(--accent2); }
 .cfg-tag.local { color: var(--muted); border: 1px solid var(--line); }
 .sublabel { font-size: .82rem; color: var(--text); font-weight: 600; margin: 14px 0 2px; }
+.teamrow { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.teamrow input { flex: 1; }
+.teamrow.me input { border-color: var(--accent2); }
+.teammark { background: none; border: none; font-size: 1.35rem; color: var(--muted); padding: 2px 4px; flex: none; line-height: 1; }
+.teammark.on { color: #fbbf24; }
 
 /* bottom nav */
 nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; z-index: 40;
