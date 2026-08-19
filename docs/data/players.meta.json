@@ -1,33 +1,33 @@
 {
-  "aggiornato": "2026-08-18T16:24:59+00:00",
-  "fonteAggiornata": "18/08/2026",
+  "aggiornato": "2026-08-19T06:57:03+00:00",
+  "fonteAggiornata": "19/08/2026",
   "sources": {
     "Listone": {
-      "fp": "18/08/2026",
-      "lastChanged": "2026-08-18T16:24:44+00:00"
+      "fp": "19/08/2026",
+      "lastChanged": "2026-08-19T06:57:03+00:00"
     },
     "Infortuni": {
-      "fp": "25accdb7449e",
-      "lastChanged": "2026-08-18T16:24:44+00:00"
+      "fp": "a4b4009fba80",
+      "lastChanged": "2026-08-19T06:57:03+00:00"
     },
     "Formazioni": {
-      "fp": "8589fc8c2dc4",
-      "lastChanged": "2026-08-18T16:24:44+00:00"
+      "fp": "1caec2fa9405",
+      "lastChanged": "2026-08-19T06:57:03+00:00"
     },
     "Rigori/Punizioni": {
       "fp": "209dd0000316",
       "lastChanged": "2026-08-18T16:24:44+00:00"
     },
     "Corner": {
-      "fp": "952da595095f",
-      "lastChanged": "2026-08-18T16:24:44+00:00"
+      "fp": "bd2caebe265c",
+      "lastChanged": "2026-08-19T06:57:03+00:00"
     }
   },
   "fonte": "fantacalcio-online.com — listone ufficiale 2026/27",
   "isDemo": false,
   "numGiocatori": 573,
   "numInfortunati": 28,
-  "numFormazioni": 282,
+  "numFormazioni": 281,
   "numRigoristi": 51,
   "numPunizioni": 56,
   "numCorner": 66,
