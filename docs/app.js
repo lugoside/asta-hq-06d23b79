@@ -277,6 +277,7 @@ function renderAll() {
   if (ui.screen === "asta") renderAsta();
   if (ui.screen === "listone") renderListone();
   if (ui.screen === "squadre") renderSquadre();
+  if (ui.screen === "analisi") renderAnalisi();
   if (ui.screen === "impostazioni") renderImpostazioni();
 }
 
@@ -474,6 +475,161 @@ function renderSquadre() {
       ${rosterHtml}
     </div>`;
   }).join("");
+}
+
+// ---- ANALISI (post-asta) ----
+// "Valore di listino": prezzo consigliato ricalcolato a stato VUOTO — una valuta
+// equa in crediti, indipendente dall'andamento dell'asta e uguale per tutte le
+// squadre. È il metro con cui misuriamo forza rosa, efficienza e affari/salassi.
+function baselinePriceMap() {
+  const base = computeBoard(adjustedPlayers(), [], effectiveConfig());
+  return new Map(base.players.map((p) => [p.id, p.prezzoConsigliato]));
+}
+
+// Aggrega gli acquisti per squadra: spesa, valore di listino e conteggio per ruolo.
+function teamAnalisi(baseP) {
+  const roleOf = new Map(PLAYERS.map((p) => [p.id, p.ruolo]));
+  const nameOf = new Map(PLAYERS.map((p) => [p.id, p.nome]));
+  const blank = () => ({ P: 0, D: 0, C: 0, A: 0 });
+  const stats = teamList().map((t) => ({
+    id: t.id, name: t.name, isMe: t.isMe, spent: 0, value: 0, count: 0,
+    spentByRole: blank(), valueByRole: blank(), countByRole: blank(),
+  }));
+  const byId = new Map(stats.map((s) => [s.id, s]));
+  for (const pu of PURCHASES) {
+    const s = byId.get(pu.team); if (!s) continue;
+    const r = roleOf.get(pu.playerId) || pu.ruolo;
+    if (!ROLES.includes(r)) continue;
+    const price = Math.max(1, Math.round(pu.price || 1));
+    const val = baseP.get(pu.playerId) ?? price; // fuori listone → valore neutro = prezzo pagato
+    s.spent += price; s.spentByRole[r] += price;
+    s.value += val;   s.valueByRole[r] += val;
+    s.count += 1;     s.countByRole[r] += 1;
+  }
+  return { stats, nameOf, roleOf };
+}
+
+function forzaBadge(ratio) {
+  if (ratio >= 1.15) return { cls: "forte", txt: "💪 Forte" };
+  if (ratio <= 0.85) return { cls: "debole", txt: "⚠️ Debole" };
+  return { cls: "media", txt: "➖ Nella media" };
+}
+
+function renderAnalisi() {
+  const el = document.getElementById("analisiBody");
+  if (!PURCHASES.length) {
+    el.innerHTML = `<div class="called empty" style="margin-top:24px">Nessun acquisto registrato.<br>L'analisi comparirà man mano che assegni i giocatori nell'Asta.</div>`;
+    return;
+  }
+  const baseP = baselinePriceMap();
+  const { stats, nameOf, roleOf } = teamAnalisi(baseP);
+  const N = stats.length || 1;
+  const me = stats.find((s) => s.isMe) || stats[0];
+  const budget = CONFIG.budgetPerTeam;
+  const rosterTot = ROLES.reduce((a, r) => a + (CONFIG.roster[r] || 0), 0);
+
+  const byForza = [...stats].sort((a, b) => b.value - a.value);
+  const myRank = byForza.findIndex((s) => s.id === me.id) + 1;
+  const avgRole = {}, maxRole = {}, roleRank = {};
+  ROLES.forEach((r) => {
+    avgRole[r] = stats.reduce((a, s) => a + s.valueByRole[r], 0) / N;
+    maxRole[r] = Math.max(1, ...stats.map((s) => s.valueByRole[r]));
+    roleRank[r] = [...stats].sort((a, b) => b.valueByRole[r] - a.valueByRole[r]).findIndex((s) => s.id === me.id) + 1;
+  });
+
+  const budgetLeft = budget - me.spent;
+  const slotsLeft = rosterTot - me.count;
+  const eff = me.spent > 0 ? me.value / me.spent : 0;
+  const sp = CONFIG.splitPct, spTot = (sp.P + sp.D + sp.C + sp.A) || 1;
+
+  // --- A. Riepilogo ---
+  const nota = slotsLeft > 0
+    ? `<div class="an-note">⏳ Asta in corso: analisi parziale (${me.count}/${rosterTot} giocatori, ${slotsLeft} slot liberi).</div>`
+    : "";
+  const riepilogo = `
+    <div class="an-grid">
+      <div class="an-card"><div class="v">#${myRank}<small>/${N}</small></div><div class="l">Forza rosa</div></div>
+      <div class="an-card"><div class="v">${me.value}</div><div class="l">Valore rosa (cr)</div></div>
+      <div class="an-card"><div class="v">${me.spent}<small>/${budget}</small></div><div class="l">Spesi</div></div>
+      <div class="an-card"><div class="v">${budgetLeft}</div><div class="l">Crediti liberi${slotsLeft > 0 ? ` · ${slotsLeft} slot` : ""}</div></div>
+    </div>
+    <div class="an-eff">Efficienza rosa: <b>×${eff.toFixed(2)}</b> valore/credito ${eff >= 1 ? "🟢" : "🔴"} <span class="hint">(quanto valore di listino hai preso per ogni credito speso)</span></div>`;
+
+  // --- B. Spesa per reparto ---
+  const spesaRep = ROLES.map((r) => {
+    const share = me.spent > 0 ? (me.spentByRole[r] / me.spent) * 100 : 0;
+    const plan = (sp[r] / spTot) * 100;
+    return `<div class="an-row">
+      <span class="rp ${r}">${r}</span>
+      <div class="grow">
+        <div class="an-line"><b>${me.spentByRole[r]}</b> cr · ${Math.round(share)}% <span class="an-plan">piano ${Math.round(plan)}%</span> · ${me.countByRole[r]} giocatori</div>
+        <div class="an-bar"><i class="fill-${r}" style="width:${Math.min(100, share)}%"></i><span class="tick" style="left:${Math.min(100, plan)}%"></span></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // --- C. Forza per reparto vs lega ---
+  const forzaRep = ROLES.map((r) => {
+    const ratio = avgRole[r] > 0 ? me.valueByRole[r] / avgRole[r] : 1;
+    const b = forzaBadge(ratio);
+    const w = (me.valueByRole[r] / maxRole[r]) * 100;
+    const avgW = (avgRole[r] / maxRole[r]) * 100;
+    return `<div class="an-row">
+      <span class="rp ${r}">${r}</span>
+      <div class="grow">
+        <div class="an-line"><span class="badge ${b.cls}">${b.txt}</span> #${roleRank[r]}/${N} · tu <b>${me.valueByRole[r]}</b> · media ${Math.round(avgRole[r])}</div>
+        <div class="an-bar"><i class="fill-${r}" style="width:${Math.min(100, w)}%"></i><span class="tick" style="left:${Math.min(100, avgW)}%"></span></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // --- D. Classifica squadre (forza) ---
+  const classifica = byForza.map((s, i) => {
+    const e = s.spent > 0 ? s.value / s.spent : 0;
+    return `<div class="row ${s.id === me.id ? "an-me" : ""}">
+      <span class="an-pos">${i + 1}</span>
+      <div class="grow"><div class="nome">${esc(s.name)}</div>
+        <div class="meta">spesi ${s.spent} · ${s.count} giocatori · eff ×${e.toFixed(2)}</div></div>
+      <span class="price">${s.value}</span>
+    </div>`;
+  }).join("");
+
+  // --- E. Affari & salassi (miei giocatori) ---
+  const mine = PURCHASES.filter((pu) => pu.team === me.id).map((pu) => {
+    const paid = Math.max(1, Math.round(pu.price || 1));
+    const base = baseP.get(pu.playerId) ?? paid;
+    return { nome: nameOf.get(pu.playerId) || pu.nome || pu.playerId, ruolo: roleOf.get(pu.playerId) || pu.ruolo || "?", paid, base, delta: paid - base };
+  });
+  const netto = mine.reduce((a, x) => a + x.delta, 0);
+  const affari = mine.filter((x) => x.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
+  const salassi = mine.filter((x) => x.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
+  const dealRow = (x, kind) => `<div class="row">
+      <span class="rp ${x.ruolo}">${x.ruolo}</span>
+      <div class="grow"><div class="nome">${esc(x.nome)}</div>
+        <div class="meta">pagato ${x.paid} · listino ${x.base}</div></div>
+      <span class="an-delta ${kind}">${x.delta > 0 ? "+" : ""}${x.delta}</span>
+    </div>`;
+  const affariHtml = affari.length ? affari.map((x) => dealRow(x, "good")).join("") : `<div class="row"><span class="meta">Nessun affare sotto il listino.</span></div>`;
+  const salassiHtml = salassi.length ? salassi.map((x) => dealRow(x, "bad")).join("") : `<div class="row"><span class="meta">Nessun sovrapprezzo rilevante.</span></div>`;
+  const nettoTxt = netto === 0 ? "in pari col listino"
+    : netto < 0 ? `<b class="an-delta good">${netto}</b> crediti risparmiati sul valore di listino`
+    : `<b class="an-delta bad">+${netto}</b> crediti spesi oltre il valore di listino`;
+
+  el.innerHTML = `
+    ${nota}
+    <div class="section-title">Riepilogo — ${esc(me.name)}</div>
+    ${riepilogo}
+    <div class="section-title">Spesa per reparto</div>
+    <div class="an-block">${spesaRep}</div>
+    <div class="section-title">Forza per reparto (vs media lega)</div>
+    <div class="an-block">${forzaRep}</div>
+    <div class="section-title">Classifica squadre per forza rosa</div>
+    <div class="list">${classifica}</div>
+    <div class="section-title">💚 I tuoi affari</div>
+    <div class="list">${affariHtml}</div>
+    <div class="section-title">💸 I tuoi salassi</div>
+    <div class="list">${salassiHtml}</div>
+    <div class="an-note" style="margin-top:12px">Saldo: ${nettoTxt}.</div>`;
 }
 
 // ---- IMPOSTAZIONI ----
