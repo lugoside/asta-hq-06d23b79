@@ -240,7 +240,7 @@ async function reconcileSync() {
       if (adoptConfig(rc)) { recompute(); renderAll(); }
       // se il cloud ha una config di vecchio formato (senza teams[]), la aggiorno al nuovo
       // schema così la LITE legge l'elenco squadre senza interventi manuali.
-      if (!Array.isArray(rc.teams) && Array.isArray(CONFIG.teams) && CONFIG.teams.length) await pushConfig();
+      if ((!Array.isArray(rc.teams) || rc.auctionOpen === undefined) && Array.isArray(CONFIG.teams) && CONFIG.teams.length) await pushConfig();
     } else if (haveLocalConfig()) await pushConfig();
 
     // 2) mosse: se il log remoto è vuoto e non ho ancora mosse locali, migro dai vecchi acquisti.
@@ -1150,7 +1150,7 @@ function wire() {
   });
   document.getElementById("auctionToggle").addEventListener("click", () => {
     CONFIG.auctionOpen = CONFIG.auctionOpen === false; // chiusa → apri, aperta → chiudi
-    persist(); recompute(); renderAll();
+    persist(); pushConfig(); recompute(); renderAll(); // push IMMEDIATO (non solo debounce)
     toast(CONFIG.auctionOpen ? "🔓 Asta aperta" : "🔒 Asta chiusa");
   });
   document.getElementById("resetBtn").addEventListener("click", () => {
