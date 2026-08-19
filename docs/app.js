@@ -1,5 +1,5 @@
 // app.js — logica dell'interfaccia. Collega dati (players.json) + engine.js + DOM.
-import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals } from "./engine.js";
+import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals, reduceMoves } from "./engine.js";
 
 // ---------------------------------------------------------------------------
 // Stato + persistenza
@@ -8,6 +8,7 @@ const LS = {
   config: "fa_config", purchases: "fa_purchases", fav: "fa_favorites",
   players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
+  moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
 };
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
@@ -28,8 +29,9 @@ const defaultConfig = () => ({
 });
 
 let CONFIG = load(LS.config, defaultConfig());
-let PURCHASES = load(LS.purchases, []);
-let FAVORITES = new Set(load(LS.fav, []));
+let MOVES = load(LS.moves, []);            // log append-only (fonte di verità degli acquisti)
+let PURCHASES = [];                         // derivato: reduceMoves(MOVES) con team ricondotti al locale
+let FAVORITES = new Set(load(LS.fav, []));  // preferiti: SOLO locali (personali, non condivisi)
 let PLAYERS = [];
 let META = {};
 let BOARD = null;
@@ -47,22 +49,44 @@ let SYNC = load(LS.sync, {
   code: "lugoasta",
   on: true,
 });
-let syncSeenTs = load(LS.syncSeen, 0);  // ultimo timestamp (del server) osservato
-let pendingPush = false;                // ho modifiche locali non ancora confermate dal cloud
 let DEVICE_ID = load(LS.device, "");
 if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
-let _es = null, _pushTimer = null, _pollId = null, _syncStatus = "off";
+let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _configTimer = null, _seeded = false;
+
+// campi di CONFIG condivisi via cloud (gli altri, come adjust/notes, restano personali)
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "splitPct", "concentration", "strappo", "myName", "opponents"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
 }
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+// persist(): una modifica di CONFIGURAZIONE/impostazioni (non un acquisto).
+// Salva localmente e programma la pubblicazione della config condivisa sul cloud.
 function persist() {
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
+  save(LS.config, CONFIG); save(LS.fav, [...FAVORITES]);
   scheduleSnapshot();
-  pendingPush = true;
-  schedulePush();
+  scheduleConfigPush();
+}
+function saveMoves() { save(LS.moves, MOVES); }
+// ricostruisce PURCHASES dal log di mosse; i team condivisi tornano id locali (MY_TEAM per me)
+function rebuildPurchases() {
+  PURCHASES = reduceMoves(MOVES).map((p) => ({ ...p, team: sharedTeamToLocal(p.team) }));
+  save(LS.purchases, PURCHASES); // cache di comodità (backup/export continuano a leggerla)
+}
+// porta lo stato acquisti verso `target` (lista in forma locale) emettendo mosse compensative.
+// Usato da reset (target vuoto), ripristino backup e import: funziona anche sotto sync condivisa.
+function applyPurchasesTarget(target) {
+  target = Array.isArray(target) ? target : [];
+  const curById = new Map(PURCHASES.map((p) => [p.playerId, p]));
+  const tgtById = new Map(target.map((p) => [p.playerId, p]));
+  for (const p of [...PURCHASES]) if (!tgtById.has(p.playerId)) emitMove({ type: "undo", playerId: p.playerId });
+  for (const t of target) {
+    const cur = curById.get(t.playerId);
+    if (!cur) emitMove({ type: "buy", playerId: t.playerId, team: t.team, price: t.price, nome: t.nome, ruolo: t.ruolo, squadra: t.squadra });
+    else if (cur.team !== t.team || cur.price !== t.price)
+      emitMove({ type: "move", playerId: t.playerId, team: t.team, price: t.price, nome: t.nome, ruolo: t.ruolo, squadra: t.squadra });
+  }
 }
 
 // --- backup automatico: anello di snapshot con data/ora ---
@@ -84,92 +108,172 @@ function snapshotNow() {
 }
 
 // ===================== Sincronizzazione cloud (Firebase RTDB REST) =====================
-// Offline-first: la memoria locale resta la base; il cloud allinea i dispositivi.
-// Nodo condiviso: <url>/leghe/<codice>.json  — chi ha il codice legge/scrive (regole Firebase).
+// Modello CONDIVISO multi-writer, offline-first. Due nodi sotto leghe/<codice>:
+//   /config          → configurazione di lega (la scrive l'app piena; tutti leggono)
+//   /moves/<pushId>  → log append-only di mosse (buy|undo|move); ognuno aggiunge le sue
+// Lo stato dell'asta è reduceMoves(tutte le mosse): i click di più persone si FONDONO
+// invece di sovrascriversi. I preferiti NON vanno sul cloud (sono personali).
 function persistSync() { save(LS.sync, SYNC); }
-function syncNodeUrl() {
+function nodeBase() {
   if (!SYNC.url || !SYNC.code) return null;
-  return SYNC.url.replace(/\/+$/, "") + "/leghe/" + encodeURIComponent(SYNC.code.trim()) + ".json";
+  return SYNC.url.replace(/\/+$/, "") + "/leghe/" + encodeURIComponent(SYNC.code.trim());
 }
+function movesUrl()  { const b = nodeBase(); return b ? b + "/moves"  : null; }
+function configUrl() { const b = nodeBase(); return b ? b + "/config" : null; }
 function setSyncStatus(s) { _syncStatus = s; if (ui.screen === "impostazioni") renderSync(); }
-function haveLocal() {
-  if (PURCHASES.length || FAVORITES.size) return true;
+
+function mkUid() {
+  return (DEVICE_ID.replace(/^dev-/, "").slice(0, 6) || "x") + "-" +
+         Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+}
+// nome-squadra condiviso ⇄ id locale (MY_TEAM per la mia squadra; gli avversari sono già nomi)
+function sharedTeamToLocal(name) { return name != null && name === (CONFIG.myName || "IO") ? MY_TEAM : name; }
+function localTeamToShared(id)   { return id === MY_TEAM ? (CONFIG.myName || "IO") : id; }
+
+function haveLocalConfig() {
   const d = defaultConfig();
-  return JSON.stringify([CONFIG.myName, CONFIG.opponents, CONFIG.splitPct, CONFIG.roster, CONFIG.numTeams, CONFIG.budgetPerTeam])
-       !== JSON.stringify([d.myName, d.opponents, d.splitPct, d.roster, d.numTeams, d.budgetPerTeam]);
+  return JSON.stringify(SHARED_CONFIG_KEYS.map((k) => CONFIG[k]))
+       !== JSON.stringify(SHARED_CONFIG_KEYS.map((k) => d[k]));
 }
 
-function schedulePush() { if (!SYNC.on) return; clearTimeout(_pushTimer); _pushTimer = setTimeout(pushStateNow, 800); }
-async function pushStateNow() {
-  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
-  const doc = {
-    updatedAt: { ".sv": "timestamp" }, // il server Firebase mette la SUA ora (unica per tutti i dispositivi)
-    deviceId: DEVICE_ID, config: CONFIG, purchases: PURCHASES, favorites: [...FAVORITES],
-  };
+// --- MOSSE: emissione locale (ottimistica) + push sul cloud ---------------------------
+// applica subito la mossa in locale e la spedisce; `team` passa alla forma condivisa.
+function emitMove(mv) {
+  const m = { uid: mkUid(), id: null, type: mv.type, playerId: mv.playerId, ts: Date.now(), byDevice: DEVICE_ID, posted: false };
+  m.id = m.uid; // finché non arriva il pushId del server, l'id stabile per il reducer è l'uid
+  if (mv.team != null)    m.team = localTeamToShared(mv.team);
+  if (mv.price != null)   m.price = mv.price;
+  if (mv.nome != null)    m.nome = mv.nome;
+  if (mv.ruolo != null)   m.ruolo = mv.ruolo;
+  if (mv.squadra != null) m.squadra = mv.squadra;
+  MOVES.push(m);
+  saveMoves(); rebuildPurchases(); scheduleSnapshot();
+  pushMoveToCloud(m);
+  return m;
+}
+async function pushMoveToCloud(m) {
+  const url = movesUrl(); if (!SYNC.on || !url) return;
+  const body = { uid: m.uid, type: m.type, playerId: m.playerId, byDevice: m.byDevice, ts: { ".sv": "timestamp" } };
+  for (const k of ["team", "price", "nome", "ruolo", "squadra"]) if (m[k] != null) body[k] = m[k];
   try {
-    await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
-    setSyncStatus("ok"); // pendingPush si azzera quando torna l'eco col timestamp del server
-  } catch { setSyncStatus("err"); }
+    await fetch(url + ".json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    m.posted = true; saveMoves(); setSyncStatus("ok");
+  } catch { setSyncStatus("err"); } // resta posted=false → ritentata al prossimo giro
 }
-function adoptRemote(doc) {
-  PURCHASES = Array.isArray(doc.purchases) ? doc.purchases : [];
-  CONFIG = doc.config ? { ...defaultConfig(), ...doc.config } : CONFIG;
-  FAVORITES = new Set(doc.favorites || []);
-  pendingPush = false;
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
-  snapshotNow();
-  recompute(); renderAll();
-  toast("Sincronizzato da un altro dispositivo");
+async function flushPending() {
+  if (!SYNC.on) return;
+  for (const m of MOVES.filter((x) => x.posted === false && x.byDevice === DEVICE_ID)) await pushMoveToCloud(m);
 }
-// Gestisce un documento ricevuto dal cloud. Ritorna 'adopted' | 'echo' | 'ignored' | 'invalid'.
-function handleRemote(doc) {
-  if (!doc || typeof doc.updatedAt !== "number") return "invalid";
-  if (doc.deviceId === DEVICE_ID) {            // eco di una MIA scrittura
-    if (doc.updatedAt > syncSeenTs) { syncSeenTs = doc.updatedAt; save(LS.syncSeen, syncSeenTs); }
-    pendingPush = false;
-    return "echo";
+// fonde le mosse ricevute dal cloud nel log locale (de-dup per uid; il ts del server prevale)
+function mergeCloudMoves(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  const byUid = new Map(MOVES.map((m) => [m.uid, m]));
+  let changed = false;
+  for (const [pushId, mv] of Object.entries(obj)) {
+    if (!mv || !mv.uid) continue;
+    const local = byUid.get(mv.uid);
+    if (!local) {
+      const inc = { ...mv, id: pushId, posted: true };
+      MOVES.push(inc); byUid.set(mv.uid, inc); changed = true;
+    } else if (typeof mv.ts === "number" && (local.ts !== mv.ts || local.id !== pushId || local.posted !== true)) {
+      Object.assign(local, mv, { id: pushId, posted: true }); changed = true; // eco confermata dal server
+    }
   }
-  if (doc.updatedAt > syncSeenTs) {            // modifica più recente di un ALTRO dispositivo
-    syncSeenTs = doc.updatedAt; save(LS.syncSeen, syncSeenTs);
-    adoptRemote(doc);
-    return "adopted";
-  }
-  return "ignored";
+  if (changed) { saveMoves(); rebuildPurchases(); }
+  return changed;
 }
-async function pullOnce() {
-  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
+
+// --- CONFIG condivisa: pubblicazione (app piena) e adozione ---------------------------
+function scheduleConfigPush() { if (!SYNC.on) return; clearTimeout(_configTimer); _configTimer = setTimeout(pushConfig, 800); }
+function sharedConfigPayload() { const o = {}; for (const k of SHARED_CONFIG_KEYS) o[k] = CONFIG[k]; return o; }
+async function pushConfig() {
+  const url = configUrl(); if (!SYNC.on || !url) return;
   try {
-    const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
-    handleRemote(remote);
-    if (pendingPush) pushStateNow();           // ritrasmetti modifiche locali non ancora confermate
+    await fetch(url + ".json", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedConfigPayload()) });
     setSyncStatus("ok");
   } catch { setSyncStatus("err"); }
 }
+function adoptConfig(remote) {
+  if (!remote || typeof remote !== "object") return false;
+  let changed = false;
+  for (const k of SHARED_CONFIG_KEYS) {
+    if (remote[k] !== undefined && JSON.stringify(remote[k]) !== JSON.stringify(CONFIG[k])) { CONFIG[k] = remote[k]; changed = true; }
+  }
+  if (changed) { save(LS.config, CONFIG); rebuildPurchases(); } // myName può cambiare → rimappa team↔MY_TEAM
+  return changed;
+}
+
+// --- Avvio/allineamento ---------------------------------------------------------------
 async function reconcileSync() {
-  const url = syncNodeUrl(); if (!SYNC.on || !url) return;
+  const cu = configUrl(), mu = movesUrl(); if (!SYNC.on || !cu || !mu) return;
   try {
-    const r = await fetch(url, { cache: "no-store" }); const remote = await r.json();
-    const res = handleRemote(remote);
-    if (res === "invalid" && haveLocal()) pushStateNow();   // cloud vuoto → semina con lo stato locale
-    else if (res === "echo" && pendingPush) pushStateNow();  // il cloud è "nostro" ma abbiamo modifiche in sospeso
+    // 1) config: se il cloud ce l'ha, è la verità condivisa → adotta; se è vuota e ho una
+    //    config non-default, la semino io (app piena = proprietaria della lega).
+    const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json();
+    if (rc && typeof rc === "object") { if (adoptConfig(rc)) { recompute(); renderAll(); } }
+    else if (haveLocalConfig()) await pushConfig();
+
+    // 2) mosse: se il log remoto è vuoto e non ho ancora mosse locali, migro dai vecchi acquisti.
+    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    const remoteEmpty = !rm || (typeof rm === "object" && !Object.keys(rm).length);
+    if (remoteEmpty && !MOVES.length) await seedMovesFromLegacy();
+    if (rm) mergeCloudMoves(rm);
+    await flushPending();
+    recompute(); renderAll(); setSyncStatus("ok");
+  } catch { setSyncStatus("err"); }
+}
+// migrazione una-tantum: acquisti del vecchio modello → mosse `buy`.
+// sorgente: acquisti locali; in mancanza, il vecchio nodo condiviso leghe/<code>/purchases.
+async function seedMovesFromLegacy() {
+  let legacy = load(LS.purchases, []);
+  if (!Array.isArray(legacy) || !legacy.length) {
+    try { const lp = await (await fetch(nodeBase() + "/purchases.json", { cache: "no-store" })).json(); if (Array.isArray(lp)) legacy = lp; } catch {}
+  }
+  if (!Array.isArray(legacy) || !legacy.length) return;
+  for (const pu of legacy) emitMove({ type: "buy", playerId: pu.playerId, team: pu.team, price: pu.price, nome: pu.nome, ruolo: pu.ruolo, squadra: pu.squadra });
+}
+async function pullOnce() {
+  const mu = movesUrl(), cu = configUrl(); if (!SYNC.on || !mu) return;
+  try {
+    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    const cm = mergeCloudMoves(rm);
+    let cc = false;
+    if (cu) { const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json(); cc = adoptConfig(rc); }
+    if (cm || cc) { recompute(); renderAll(); }
+    await flushPending();
     setSyncStatus("ok");
   } catch { setSyncStatus("err"); }
 }
 function connectSSE() {
-  if (_es) { _es.close(); _es = null; }
-  const url = syncNodeUrl(); if (!SYNC.on || !url || typeof EventSource === "undefined") return;
+  for (const es of [_esMoves, _esConfig]) if (es) es.close();
+  _esMoves = _esConfig = null;
+  const mu = movesUrl(), cu = configUrl();
+  if (!SYNC.on || !mu || typeof EventSource === "undefined") return;
   try {
-    _es = new EventSource(url);
-    const handler = (ev) => {
+    _esMoves = new EventSource(mu + ".json");
+    const onMoves = (ev) => {
       try {
-        const msg = JSON.parse(ev.data);
-        if (msg && msg.path === "/") handleRemote(msg.data);
+        const msg = JSON.parse(ev.data); if (!msg) return;
+        if (msg.path === "/") { if (mergeCloudMoves(msg.data)) { recompute(); renderAll(); } }
+        else if (msg.path && msg.data && msg.data.uid) {
+          const pushId = msg.path.replace(/^\//, "");
+          if (mergeCloudMoves({ [pushId]: msg.data })) { recompute(); renderAll(); }
+        }
       } catch {}
     };
-    _es.addEventListener("put", handler);
-    _es.addEventListener("patch", handler);
-    _es.onopen = () => setSyncStatus("ok");
-    _es.onerror = () => setSyncStatus("err");
+    _esMoves.addEventListener("put", onMoves);
+    _esMoves.addEventListener("patch", onMoves);
+    _esMoves.onopen = () => setSyncStatus("ok");
+    _esMoves.onerror = () => setSyncStatus("err");
+
+    if (cu) {
+      _esConfig = new EventSource(cu + ".json");
+      const onConfig = (ev) => {
+        try { const msg = JSON.parse(ev.data); if (msg && msg.path === "/" && adoptConfig(msg.data)) { recompute(); renderAll(); } } catch {}
+      };
+      _esConfig.addEventListener("put", onConfig);
+      _esConfig.addEventListener("patch", onConfig);
+    }
   } catch { setSyncStatus("err"); }
 }
 function startSync() {
@@ -178,7 +282,8 @@ function startSync() {
   if (!_pollId) _pollId = setInterval(pullOnce, 15000); // rete di sicurezza se l'SSE cade
 }
 function stopSync() {
-  if (_es) { _es.close(); _es = null; }
+  for (const es of [_esMoves, _esConfig]) if (es) es.close();
+  _esMoves = _esConfig = null;
   if (_pollId) { clearInterval(_pollId); _pollId = null; }
   setSyncStatus("off");
 }
@@ -716,10 +821,9 @@ function restoreBackup(idx) {
   const when = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   if (!confirm(`Ripristinare il backup delle ${when} (${(s.purchases || []).length} acquisti)?\nLo stato attuale verrà prima salvato tra i backup.`)) return;
   snapshotNow(); // salva lo stato corrente prima di sovrascrivere
-  PURCHASES = Array.isArray(s.purchases) ? s.purchases.slice() : [];
-  if (s.config) CONFIG = { ...defaultConfig(), ...s.config };
-  if (s.favorites) FAVORITES = new Set(s.favorites);
-  save(LS.config, CONFIG); save(LS.purchases, PURCHASES); save(LS.fav, [...FAVORITES]);
+  if (s.config) { CONFIG = { ...defaultConfig(), ...s.config }; persist(); }
+  if (s.favorites) { FAVORITES = new Set(s.favorites); save(LS.fav, [...FAVORITES]); }
+  applyPurchasesTarget(Array.isArray(s.purchases) ? s.purchases : []); // riallinea via mosse (anche sul cloud)
   snapshotNow();
   recompute(); renderAll(); toast("Backup ripristinato");
 }
@@ -747,30 +851,29 @@ function recordPurchase(team) {
   const input = document.getElementById("priceInput");
   const price = Math.max(1, Math.round(Number(input?.value) || p.prezzoConsigliato));
   // salvo anche nome/ruolo/squadra: l'acquisto resta valido anche se il listone cambia
-  PURCHASES.push({ playerId: selectedId, price, team, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra });
-  persist(); snapshotNow(); recompute();
+  emitMove({ type: "buy", playerId: selectedId, team, price, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra });
+  recompute();
   toast(`${p.nome} → ${teamName(team)} a ${price}`);
   selectedId = null;
   buyFlow = { mode: "idle", team: null, price: null };
   renderAll();
 }
-function undoPurchaseIdx(idx) {
-  if (idx >= 0 && idx < PURCHASES.length) {
-    const pu = PURCHASES[idx]; const pl = PLAYERS.find((x) => x.id === pu.playerId);
-    PURCHASES.splice(idx, 1); persist(); snapshotNow(); recompute();
-    toast(`Annullato: ${pl ? pl.nome : (pu.nome || "acquisto")}`);
-    renderAll();
-  }
-}
 function undoPurchaseByPlayer(id) {
-  const idx = PURCHASES.map((p) => p.playerId).lastIndexOf(id);
-  undoPurchaseIdx(idx);
+  const pu = PURCHASES.find((p) => p.playerId === id);
+  const pl = PLAYERS.find((x) => x.id === id);
+  emitMove({ type: "undo", playerId: id });
+  recompute();
+  toast(`Annullato: ${pl ? pl.nome : (pu && pu.nome) || "acquisto"}`);
+  renderAll();
+}
+function undoPurchaseIdx(idx) {
+  if (idx >= 0 && idx < PURCHASES.length) undoPurchaseByPlayer(PURCHASES[idx].playerId);
 }
 function movePurchase(pid, toTeam) {
   const pu = PURCHASES.find((p) => p.playerId === pid);
   if (!pu || pu.team === toTeam) return;
-  pu.team = toTeam;
-  persist(); snapshotNow(); recompute(); renderAll();
+  emitMove({ type: "move", playerId: pid, team: toTeam, price: pu.price, nome: pu.nome, ruolo: pu.ruolo, squadra: pu.squadra });
+  recompute(); renderAll();
   const pl = PLAYERS.find((x) => x.id === pid);
   toast(`${pl ? pl.nome : "Giocatore"} → ${teamName(toTeam)}`);
 }
@@ -965,7 +1068,8 @@ function wire() {
   document.getElementById("resetBtn").addEventListener("click", () => {
     if (confirm("Azzerare tutti gli acquisti dell'asta? Lo stato attuale resta tra i backup automatici (potrai ripristinarlo). Impostazioni e obiettivi restano.")) {
       snapshotNow();                 // salva lo stato pre-reset così è recuperabile
-      PURCHASES = []; selectedId = null; persist(); snapshotNow(); recompute();
+      applyPurchasesTarget([]);       // emette gli undo di tutti gli acquisti presenti (anche sul cloud)
+      selectedId = null; snapshotNow(); recompute();
       toast("Asta azzerata (recuperabile dai backup)"); setScreen("asta");
     }
   });
@@ -991,7 +1095,7 @@ function wire() {
 
 function toggleFav(id) {
   if (FAVORITES.has(id)) FAVORITES.delete(id); else FAVORITES.add(id);
-  persist();
+  save(LS.fav, [...FAVORITES]); // i preferiti sono personali: solo locali, non vanno sul cloud
   if (ui.screen === "listone") renderListone();
 }
 
@@ -1010,10 +1114,10 @@ function importBackup(e) {
   reader.onload = () => {
     try {
       const d = JSON.parse(reader.result);
-      if (d.config) CONFIG = { ...defaultConfig(), ...d.config };
-      if (d.purchases) PURCHASES = d.purchases;
-      if (d.favorites) FAVORITES = new Set(d.favorites);
-      persist(); snapshotNow(); recompute(); renderAll(); toast("Backup importato");
+      if (d.config) { CONFIG = { ...defaultConfig(), ...d.config }; persist(); }
+      if (d.favorites) { FAVORITES = new Set(d.favorites); save(LS.fav, [...FAVORITES]); }
+      if (d.purchases) applyPurchasesTarget(d.purchases); // riallinea via mosse (fonde con l'asta condivisa)
+      snapshotNow(); recompute(); renderAll(); toast("Backup importato");
     } catch { toast("File non valido"); }
   };
   reader.readAsText(file);
@@ -1029,6 +1133,7 @@ async function init() {
   try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch {}
   try { await loadData(false); }
   catch { document.getElementById("calledCard").textContent = "Impossibile caricare i dati."; return; }
+  rebuildPurchases(); // deriva gli acquisti dal log di mosse locale prima del primo calcolo
   recompute();
   renderAll();
   if (SYNC.on) startSync();

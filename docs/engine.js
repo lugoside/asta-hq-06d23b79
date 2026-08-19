@@ -29,7 +29,94 @@ export const DEFAULT_CONFIG = {
 };
 
 export const ROLES = ["P", "D", "C", "A"];
-export const MY_TEAM = "__ME__"; // id speciale per la mia squadra
+export const MY_TEAM = "__ME__"; // id speciale per la mia squadra (solo lato UI locale)
+
+// ---------------------------------------------------------------------------
+// Log di mosse append-only → stato acquisti (modello condiviso multi-writer).
+//
+// Ogni mossa è un evento assoluto (non incrementale):
+//   { uid, type: "buy"|"undo"|"move", playerId, team, price?, nome?, ruolo?, squadra?, ts, byDevice }
+// - buy  : il giocatore è assegnato a `team` per `price`
+// - undo : il giocatore torna disponibile
+// - move : il giocatore passa a `team` (prezzo invariato salvo `price` esplicito)
+//
+// reduceMoves riduce il log allo stato finale `purchases[]` che l'engine già
+// consuma. Proprietà chiave:
+//   * DETERMINISTICO: dipende solo dall'insieme delle mosse, non dall'ordine di
+//     arrivo (si ordina per ts, poi per id come tie-break stabile).
+//   * IDEMPOTENTE: rigiocare la stessa mossa (stesso uid o stesso effetto) non
+//     cambia il risultato → due dispositivi che scrivono insieme convergono.
+// `team` nel log è SEMPRE un nome-squadra condiviso, mai MY_TEAM.
+// ---------------------------------------------------------------------------
+export function reduceMoves(moves) {
+  // accetta sia un oggetto Firebase { pushId: move } sia un array [{id?, ...}]
+  const events = Array.isArray(moves)
+    ? moves.map((m, i) => ({ id: m.id ?? m.uid ?? String(i), ...m }))
+    : Object.entries(moves || {}).map(([id, m]) => ({ id, ...(m || {}) }));
+
+  // de-dup per uid: preferisci la copia col ts numerico (confermata dal server)
+  const byUid = new Map();
+  for (const e of events) {
+    if (!e || !e.uid) { byUid.set(Symbol(), e); continue; } // senza uid: tienila comunque
+    const prev = byUid.get(e.uid);
+    if (!prev) { byUid.set(e.uid, e); continue; }
+    const prevTs = typeof prev.ts === "number" ? prev.ts : -1;
+    const curTs = typeof e.ts === "number" ? e.ts : -1;
+    if (curTs >= prevTs) byUid.set(e.uid, e);
+  }
+  const uniq = [...byUid.values()].filter(Boolean);
+
+  // ordina per (ts, id): ts non numerici (mosse locali non ancora confermate)
+  // vanno in coda, così un'eco confermata dal server prevale sull'ottimistica.
+  uniq.sort((a, b) => {
+    const ta = typeof a.ts === "number" ? a.ts : Infinity;
+    const tb = typeof b.ts === "number" ? b.ts : Infinity;
+    if (ta !== tb) return ta - tb;
+    return String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0;
+  });
+
+  const byPlayer = new Map(); // playerId -> { present, price, team, nome, ruolo, squadra }
+  for (const e of uniq) {
+    if (!e || !e.playerId || !e.type) continue;
+    const cur = byPlayer.get(e.playerId) || { present: false };
+    if (e.type === "buy") {
+      byPlayer.set(e.playerId, {
+        present: true,
+        price: e.price,
+        team: e.team,
+        nome: e.nome ?? cur.nome,
+        ruolo: e.ruolo ?? cur.ruolo,
+        squadra: e.squadra ?? cur.squadra,
+      });
+    } else if (e.type === "undo") {
+      byPlayer.set(e.playerId, { ...cur, present: false });
+    } else if (e.type === "move") {
+      byPlayer.set(e.playerId, {
+        ...cur,
+        present: cur.present !== false, // un move implica che è preso
+        team: e.team,
+        price: e.price != null ? e.price : cur.price,
+        nome: e.nome ?? cur.nome,
+        ruolo: e.ruolo ?? cur.ruolo,
+        squadra: e.squadra ?? cur.squadra,
+      });
+    }
+  }
+
+  const purchases = [];
+  for (const [playerId, v] of byPlayer) {
+    if (!v.present) continue;
+    purchases.push({
+      playerId,
+      price: Math.max(1, Math.round(v.price || 1)),
+      team: v.team,
+      nome: v.nome,
+      ruolo: v.ruolo,
+      squadra: v.squadra,
+    });
+  }
+  return purchases;
+}
 
 // ---------------------------------------------------------------------------
 // Utility
