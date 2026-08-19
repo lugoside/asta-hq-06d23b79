@@ -26,6 +26,7 @@ const defaultConfig = () => ({
   // myTeam = quale squadra sono IO (scelta LOCALE, non condivisa).
   teams: ["IO", ...Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`)],
   myTeam: "IO",
+  auctionOpen: true, // asta aperta/chiusa (config di LEGA): quando chiusa, nessuno modifica le rose
   adjust: {}, // aggiustamento manuale del valore per giocatore: { playerId: percentuale }
   notes: {},  // note manuali per giocatore: { playerId: "testo" }
 });
@@ -47,6 +48,7 @@ function normalizeConfig(c) {
   }
   c.numTeams = c.teams.length;
   if (!c.myTeam || !c.teams.includes(c.myTeam)) c.myTeam = c.teams[0]; // "io" deve esistere
+  if (typeof c.auctionOpen !== "boolean") c.auctionOpen = true;        // default: asta aperta
   delete c.myName; delete c.opponents;                 // via i campi obsoleti
   return c;
 }
@@ -78,7 +80,7 @@ let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _con
 
 // Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
 // Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
-const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams"];
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams", "auctionOpen"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -446,6 +448,8 @@ function renderBudgetBar() {
 
 // ---- ASTA ----
 function renderAsta() {
+  const ban = document.getElementById("auctionBanner");
+  if (ban) ban.style.display = CONFIG.auctionOpen === false ? "block" : "none";
   const card = document.getElementById("calledCard");
   const p = selectedId ? boardPlayer(selectedId) : null;
   if (!p) {
@@ -783,6 +787,15 @@ function renderImpostazioni() {
     `<br>⬇ Ultimo scaricamento: ${fmtScarico()}` +
     `<br>Fonte: ${esc(META.fonte || "—")}`;
 
+  const at = document.getElementById("auctionToggle");
+  if (at) {
+    const open = CONFIG.auctionOpen !== false;
+    at.textContent = open ? "🔓 Asta APERTA — tocca per chiudere" : "🔒 Asta CHIUSA — tocca per aprire";
+    at.className = "btn full " + (open ? "me" : "danger");
+    document.getElementById("auctionHint").textContent = open
+      ? "Aperta: si possono modificare le rose. Chiudila a mercato finito."
+      : "Chiusa: nessuno può modificare le rose (né tu né gli avversari) finché non riapri.";
+  }
   document.getElementById("numTeamsStepper").innerHTML = stepper("numTeams", CONFIG.numTeams + " squadre", 1);
   const rs = document.getElementById("rosterSettings");
   if (rs) rs.innerHTML = ROLES.map((r) => `
@@ -860,6 +873,7 @@ function renderBackups() {
 }
 
 function restoreBackup(idx) {
+  if (auctionClosed()) return;
   const hist = load(LS.history, []);
   const s = hist[idx];
   if (!s) return;
@@ -898,7 +912,14 @@ function selectPlayer(id) {
   renderAll();
 }
 
+// gate: quando l'asta è chiusa (config di lega), niente modifiche alle rose per nessuno
+function auctionClosed() {
+  if (CONFIG.auctionOpen === false) { toast("🔒 Asta chiusa: modifiche disabilitate"); return true; }
+  return false;
+}
+
 function recordPurchase(team) {
+  if (auctionClosed()) return;
   const p = boardPlayer(selectedId); if (!p) return;
   const input = document.getElementById("priceInput");
   const price = Math.max(1, Math.round(Number(input?.value) || p.prezzoConsigliato));
@@ -911,6 +932,7 @@ function recordPurchase(team) {
   renderAll();
 }
 function undoPurchaseByPlayer(id) {
+  if (auctionClosed()) return;
   const pu = PURCHASES.find((p) => p.playerId === id);
   const pl = PLAYERS.find((x) => x.id === id);
   emitMove({ type: "undo", playerId: id });
@@ -922,6 +944,7 @@ function undoPurchaseIdx(idx) {
   if (idx >= 0 && idx < PURCHASES.length) undoPurchaseByPlayer(PURCHASES[idx].playerId);
 }
 function movePurchase(pid, toTeam) {
+  if (auctionClosed()) return;
   const pu = PURCHASES.find((p) => p.playerId === pid);
   if (!pu || pu.team === toTeam) return;
   emitMove({ type: "move", playerId: pid, team: toTeam, price: pu.price, nome: pu.nome, ruolo: pu.ruolo, squadra: pu.squadra });
@@ -1125,7 +1148,13 @@ function wire() {
     CONFIG.myTeam = CONFIG.teams[Number(mk.dataset.myteam)]; // scelta LOCALE (non condivisa sul cloud)
     save(LS.config, CONFIG); rebuildPurchases(); recompute(); renderAll();
   });
+  document.getElementById("auctionToggle").addEventListener("click", () => {
+    CONFIG.auctionOpen = CONFIG.auctionOpen === false; // chiusa → apri, aperta → chiudi
+    persist(); recompute(); renderAll();
+    toast(CONFIG.auctionOpen ? "🔓 Asta aperta" : "🔒 Asta chiusa");
+  });
   document.getElementById("resetBtn").addEventListener("click", () => {
+    if (auctionClosed()) return;
     if (confirm("⚠️ Azzerare l'asta cancella gli acquisti di TUTTA la lega (sincronizzati su tutti i dispositivi), non solo i tuoi. Lo stato attuale resta nei backup automatici. Impostazioni e obiettivi restano. Procedere?")) {
       snapshotNow();                 // salva lo stato pre-reset così è recuperabile
       applyPurchasesTarget([]);       // emette gli undo di tutti gli acquisti presenti (anche sul cloud)
@@ -1169,6 +1198,7 @@ function exportBackup() {
   toast("Backup esportato");
 }
 function importBackup(e) {
+  if (auctionClosed()) { e.target.value = ""; return; }
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {

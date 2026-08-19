@@ -180,6 +180,9 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .hint { font-size: .76rem; color: var(--muted); line-height: 1.4; }
 
+/* banner asta chiusa */
+.auction-banner { background: rgba(220,38,38,.15); color: #fca5a5; border: 1px solid rgba(220,38,38,.4); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-weight: 700; text-align: center; }
+
 /* analisi */
 .an-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .an-card { background: var(--card2); border-radius: 12px; padding: 12px 10px; text-align: center; }

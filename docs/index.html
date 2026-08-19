@@ -34,6 +34,8 @@
         <div class="results" id="searchResults"></div>
       </div>
 
+      <div id="auctionBanner" class="auction-banner" style="display:none">🔒 Asta chiusa — le modifiche alle rose sono disabilitate</div>
+
       <div class="called empty" id="calledCard">
         Cerca un giocatore per vedere il prezzo consigliato.
       </div>
@@ -114,6 +116,11 @@
 
       <div class="section-title">🌐 Configurazione di lega <span class="cfg-tag shared">condivisa</span></div>
       <div class="hint" style="margin-bottom:2px">Valgono per l'intera lega: modificandole qui, si aggiornano su <b>tutti i dispositivi</b> collegati allo stesso Codice Lega.</div>
+      <div class="setting">
+        <label>Stato dell'asta</label>
+        <button class="btn full" id="auctionToggle" style="margin-top:0"></button>
+        <div class="hint" id="auctionHint" style="margin-top:6px"></div>
+      </div>
       <div class="setting">
         <label>Numero di squadre</label>
         <div id="numTeamsStepper"></div>
