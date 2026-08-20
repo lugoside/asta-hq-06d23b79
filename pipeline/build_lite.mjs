@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const SRC = "docs/data";
 const OUT = process.env.LITE_OUT || "../Fantacalcio-lite/docs/data";
-const KEEP = ["id", "nome", "squadra", "ruolo", "qi", "isNuovo"]; // campi pubblici tenuti
+const KEEP = ["id", "nome", "squadra", "ruolo", "isNuovo"]; // solo campi neutri (niente qi: è scala di valori)
 
 const players = JSON.parse(readFileSync(`${SRC}/players.json`, "utf8"));
 const lite = players.map((p) => {
