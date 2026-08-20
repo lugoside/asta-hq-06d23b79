@@ -11,7 +11,7 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v36"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v37"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -239,10 +239,14 @@ async function pushConfig() {
 }
 function adoptConfig(remote) {
   if (!remote || typeof remote !== "object") return false;
+  const prevReset = CONFIG.resetAt || 0;
   let changed = false;
   for (const k of SHARED_CONFIG_KEYS) {
     if (remote[k] !== undefined && JSON.stringify(remote[k]) !== JSON.stringify(CONFIG[k])) { CONFIG[k] = remote[k]; changed = true; }
   }
+  // resetAt MONOTÒNO: non scende mai (un device con valore vecchio non può abbassarlo)
+  const maxReset = Math.max(prevReset, remote.resetAt || 0);
+  if ((CONFIG.resetAt || 0) !== maxReset) { CONFIG.resetAt = maxReset; changed = true; }
   if (changed) { normalizeConfig(CONFIG); save(LS.config, CONFIG); applyResetIfNeeded(); rebuildPurchases(); } // teams→myTeam valido; resetAt→purga mosse locali
   return changed;
 }
