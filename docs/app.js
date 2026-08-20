@@ -11,7 +11,7 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v35"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v36"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1174,7 +1174,11 @@ function wire() {
     toast(CONFIG.auctionOpen ? "🔓 Asta aperta" : "🔒 Asta chiusa");
   });
   document.getElementById("resetBtn").addEventListener("click", async () => {
-    if (!confirm("⚠️ Azzerare l'asta per TUTTA la lega? Cancella tutti gli acquisti dal cloud e da ogni dispositivo collegato. Lo stato attuale resta nei backup locali. Procedere?")) return;
+    const online = SYNC.on && !!movesUrl(); // il reset raggiunge la lega solo se la sync è attiva
+    const msg = online
+      ? "⚠️ Azzerare l'asta per TUTTA la lega? Cancella tutti gli acquisti dal cloud e da ogni dispositivo collegato. Lo stato attuale resta nei backup locali. Procedere?"
+      : "⚠️ SYNC SPENTA: il reset azzererà SOLO questo dispositivo, NON la lega. Per azzerare tutti attiva prima la sincronizzazione. Procedere lo stesso (solo qui)?";
+    if (!confirm(msg)) return;
     snapshotNow();                              // salva lo stato pre-reset (recuperabile in locale)
     const now = Date.now();
     CONFIG.resetAt = now; save(LS.config, CONFIG); resetSeen = now; save(LS.resetSeen, now);
@@ -1182,7 +1186,7 @@ function wire() {
     await deleteCloudMoves();                    // svuota il log condiviso
     pushConfig();                                // pubblica resetAt → gli altri dispositivi si puliscono
     selectedId = null; recompute(); renderAll();
-    toast("Asta azzerata per tutta la lega"); setScreen("asta");
+    toast(online ? "Asta azzerata per tutta la lega" : "⚠️ Azzerata solo qui (sync spenta)"); setScreen("asta");
   });
   // --- sincronizzazione ---
   document.getElementById("syncUrl").addEventListener("change", (e) => { SYNC.url = e.target.value.trim(); persistSync(); if (SYNC.on) startSync(); });
