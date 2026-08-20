@@ -1,7 +1,7 @@
 // Service worker: NETWORK-FIRST con fallback su cache.
 // Online → sempre l'ultima versione (app + dati). Offline → ultima copia salvata.
 // Così ogni aggiornamento del codice arriva subito, mantenendo la resilienza offline.
-const VERSION = "v33";
+const VERSION = "v34";
 const CACHE = "fa-" + VERSION;
 const SHELL_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js", "./engine.js",
@@ -15,7 +15,8 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // pulisci SOLO le vecchie cache di QUESTA app (fa-*): la LITE (fal-*) vive sullo stesso dominio
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("fa-") && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
