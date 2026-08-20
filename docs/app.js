@@ -11,7 +11,7 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v37"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v38"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -82,6 +82,7 @@ let SYNC = load(LS.sync, {
 let DEVICE_ID = load(LS.device, "");
 if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
 let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _configTimer = null, _seeded = false;
+const _inflight = new Set(); // uid delle mosse in invio (in MEMORIA, non persistito): dedup senza perdere ritenti
 
 // Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
 // Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
@@ -195,14 +196,15 @@ function emitMove(mv) {
   return m;
 }
 async function pushMoveToCloud(m) {
-  const url = movesUrl(); if (!SYNC.on || !url || m.posted) return; // già inviata/in invio → niente duplicati
-  m.posted = true; saveMoves();                                     // guardia OTTIMISTICA: blocca push concorrenti
+  const url = movesUrl(); if (!SYNC.on || !url || m.posted || _inflight.has(m.uid)) return; // già inviata / in invio
+  _inflight.add(m.uid);                                             // dedup concorrenza (in memoria)
   const body = { uid: m.uid, type: m.type, playerId: m.playerId, byDevice: m.byDevice, ts: { ".sv": "timestamp" } };
   for (const k of ["team", "price", "nome", "ruolo", "squadra"]) if (m[k] != null) body[k] = m[k];
   try {
     await fetch(url + ".json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setSyncStatus("ok");
-  } catch { m.posted = false; saveMoves(); setSyncStatus("err"); }  // ripristina per ritentare
+    m.posted = true; saveMoves(); setSyncStatus("ok");             // posted solo DOPO invio riuscito → fetch interrotta = ritentata
+  } catch { setSyncStatus("err"); }
+  finally { _inflight.delete(m.uid); }
 }
 async function flushPending() {
   if (!SYNC.on) return;
