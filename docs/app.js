@@ -10,8 +10,19 @@ const LS = {
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
+  unlocked: "fa_unlocked", // gate master password superato su questo dispositivo
 };
-const APP_VERSION = "v39"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+// Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
+// i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
+const MASTER_PW_HASH = "9d469067065248e17baf9330ab4a350c1b5785780f247996377112154992e566";
+async function checkMasterPw(pw) {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw || ""));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("") === MASTER_PW_HASH;
+  } catch { return false; }
+}
+let unlocked = load(LS.unlocked, false);
+const APP_VERSION = "v40"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1103,8 +1114,12 @@ function wire() {
   });
 
   // click delega su tutta la pagina
+  document.body.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target && e.target.id === "gatePw") { e.preventDefault(); submitGate(); }
+  });
   document.body.addEventListener("click", (e) => {
     if (justDragged) return; // ignora il click sintetico dopo un trascinamento
+    if (e.target.closest("#gateBtn")) { submitGate(); return; }
     const sd = e.target.closest("[data-sd]");
     if (sd) { applyStep(sd.dataset.sd, Number(sd.dataset.dd)); return; }
     const remP = e.target.closest("[data-remove-purchase]");
@@ -1249,8 +1264,37 @@ function importBackup(e) {
 // ---------------------------------------------------------------------------
 // Avvio
 // ---------------------------------------------------------------------------
+// Schermata di sblocco (master password) sulla prima apertura di QUESTO dispositivo.
+function renderGate() {
+  const el = document.getElementById("gate"); if (!el) return;
+  if (unlocked) { el.style.display = "none"; return; }
+  el.style.display = "flex";
+  el.innerHTML = `<div class="gate-card">
+    <div class="gate-logo">FA</div>
+    <h2>FantaAsta</h2>
+    <p>Accesso riservato all'admin.<br>Inserisci la password.</p>
+    <input id="gatePw" type="password" autocomplete="off" placeholder="password" />
+    <button class="btn me full" id="gateBtn" style="margin-top:10px">Entra</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>`;
+  const inp = document.getElementById("gatePw"); if (inp) setTimeout(() => inp.focus(), 50);
+}
+function submitGate() {
+  const inp = document.getElementById("gatePw"); const pw = inp ? inp.value : "";
+  checkMasterPw(pw).then((ok) => {
+    if (ok) { unlocked = true; save(LS.unlocked, true); renderGate(); bootApp(); }
+    else { const er = document.getElementById("gateErr"); if (er) er.textContent = "Password errata"; if (inp) { inp.value = ""; inp.focus(); } }
+  });
+}
+
 async function init() {
   wire();
+  renderGate();
+  if (unlocked) bootApp();   // se già sbloccato su questo dispositivo, parti; altrimenti aspetta la password
+}
+let _booted = false;
+async function bootApp() {
+  if (_booted) return; _booted = true;
   // chiedi al browser di NON sfrattare i dati salvati (importante durante l'asta)
   try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch {}
   try { await loadData(false); }
