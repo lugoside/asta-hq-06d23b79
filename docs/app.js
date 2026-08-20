@@ -9,8 +9,9 @@ const LS = {
   players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
+  resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v31"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v32"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -28,6 +29,7 @@ const defaultConfig = () => ({
   teams: ["IO", ...Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`)],
   myTeam: "IO",
   auctionOpen: true, // asta aperta/chiusa (config di LEGA): quando chiusa, nessuno modifica le rose
+  resetAt: 0,        // marcatore reset di lega: quando cresce, ogni dispositivo azzera le mosse locali
   adjust: {}, // aggiustamento manuale del valore per giocatore: { playerId: percentuale }
   notes: {},  // note manuali per giocatore: { playerId: "testo" }
 });
@@ -50,12 +52,14 @@ function normalizeConfig(c) {
   c.numTeams = c.teams.length;
   if (!c.myTeam || !c.teams.includes(c.myTeam)) c.myTeam = c.teams[0]; // "io" deve esistere
   if (typeof c.auctionOpen !== "boolean") c.auctionOpen = true;        // default: asta aperta
+  if (typeof c.resetAt !== "number") c.resetAt = 0;
   delete c.myName; delete c.opponents;                 // via i campi obsoleti
   return c;
 }
 
 let CONFIG = normalizeConfig(load(LS.config, defaultConfig()));
 let MOVES = load(LS.moves, []);            // log append-only (fonte di verità degli acquisti)
+let resetSeen = load(LS.resetSeen, 0);     // ultimo resetAt applicato localmente
 let PURCHASES = [];                         // derivato: reduceMoves(MOVES) con team ricondotti al locale
 let FAVORITES = new Set(load(LS.fav, []));  // preferiti: SOLO locali (personali, non condivisi)
 let PLAYERS = [];
@@ -81,7 +85,7 @@ let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _con
 
 // Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
 // Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
-const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams", "auctionOpen"];
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams", "auctionOpen", "resetAt"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -96,6 +100,18 @@ function persist() {
   scheduleConfigPush();
 }
 function saveMoves() { save(LS.moves, MOVES); }
+// reset di lega: se resetAt (config condivisa) è cresciuto, azzera le mosse LOCALI.
+// Il cloud /moves viene svuotato dall'admin; così ogni dispositivo riparte pulito.
+function applyResetIfNeeded() {
+  if ((CONFIG.resetAt || 0) > resetSeen) {
+    MOVES = []; saveMoves();
+    resetSeen = CONFIG.resetAt; save(LS.resetSeen, resetSeen);
+  }
+}
+async function deleteCloudMoves() {
+  const url = movesUrl(); if (!SYNC.on || !url) return;
+  try { await fetch(url + ".json", { method: "DELETE" }); } catch {}
+}
 // ricostruisce PURCHASES dal log di mosse; i team condivisi tornano id locali (MY_TEAM per me)
 function rebuildPurchases() {
   PURCHASES = reduceMoves(MOVES).map((p) => ({ ...p, team: sharedTeamToLocal(p.team) }));
@@ -226,7 +242,7 @@ function adoptConfig(remote) {
   for (const k of SHARED_CONFIG_KEYS) {
     if (remote[k] !== undefined && JSON.stringify(remote[k]) !== JSON.stringify(CONFIG[k])) { CONFIG[k] = remote[k]; changed = true; }
   }
-  if (changed) { normalizeConfig(CONFIG); save(LS.config, CONFIG); rebuildPurchases(); } // teams può cambiare → myTeam valido + rimappa
+  if (changed) { normalizeConfig(CONFIG); save(LS.config, CONFIG); applyResetIfNeeded(); rebuildPurchases(); } // teams→myTeam valido; resetAt→purga mosse locali
   return changed;
 }
 
@@ -1156,14 +1172,16 @@ function wire() {
     persist(); pushConfig(); recompute(); renderAll(); // push IMMEDIATO (non solo debounce)
     toast(CONFIG.auctionOpen ? "🔓 Asta aperta" : "🔒 Asta chiusa");
   });
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    if (auctionClosed()) return;
-    if (confirm("⚠️ Azzerare l'asta cancella gli acquisti di TUTTA la lega (sincronizzati su tutti i dispositivi), non solo i tuoi. Lo stato attuale resta nei backup automatici. Impostazioni e obiettivi restano. Procedere?")) {
-      snapshotNow();                 // salva lo stato pre-reset così è recuperabile
-      applyPurchasesTarget([]);       // emette gli undo di tutti gli acquisti presenti (anche sul cloud)
-      selectedId = null; snapshotNow(); recompute();
-      toast("Asta azzerata (recuperabile dai backup)"); setScreen("asta");
-    }
+  document.getElementById("resetBtn").addEventListener("click", async () => {
+    if (!confirm("⚠️ Azzerare l'asta per TUTTA la lega? Cancella tutti gli acquisti dal cloud e da ogni dispositivo collegato. Lo stato attuale resta nei backup locali. Procedere?")) return;
+    snapshotNow();                              // salva lo stato pre-reset (recuperabile in locale)
+    const now = Date.now();
+    CONFIG.resetAt = now; save(LS.config, CONFIG); resetSeen = now; save(LS.resetSeen, now);
+    MOVES = []; saveMoves(); rebuildPurchases(); // pulizia locale immediata
+    await deleteCloudMoves();                    // svuota il log condiviso
+    pushConfig();                                // pubblica resetAt → gli altri dispositivi si puliscono
+    selectedId = null; recompute(); renderAll();
+    toast("Asta azzerata per tutta la lega"); setScreen("asta");
   });
   // --- sincronizzazione ---
   document.getElementById("syncUrl").addEventListener("change", (e) => { SYNC.url = e.target.value.trim(); persistSync(); if (SYNC.on) startSync(); });
