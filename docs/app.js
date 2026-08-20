@@ -10,7 +10,7 @@ const LS = {
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
 };
-const APP_VERSION = "v30"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v31"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -458,7 +458,7 @@ function renderAsta() {
     card.textContent = "Cerca un giocatore per vedere il prezzo consigliato.";
   } else {
     card.className = "called";
-    const offer = buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato);
+    const offer = buyFlow.price != null ? buyFlow.price : 1;
     let semClass, semTxt;
     if (p.taken) { semClass = "giallo"; semTxt = `✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}`; }
     else { const v = offerVerdict(p, offer); semClass = v.cls; semTxt = v.txt; }
@@ -484,7 +484,7 @@ function renderAsta() {
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">
         <button class="step" data-step="-1">−</button>
-        <input id="priceInput" type="number" inputmode="numeric" min="1" value="${buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato)}" />
+        <input id="priceInput" type="number" inputmode="numeric" min="1" value="${buyFlow.price != null ? buyFlow.price : 1}" />
         <button class="step" data-step="1">+</button>
       </div>
       ${buyActionsHtml(p)}`}
@@ -526,7 +526,7 @@ function buyActionsHtml(p) {
       <button class="btn ghost full" data-flow="idle" style="margin-top:8px">← indietro</button>`;
   }
   if (buyFlow.mode === "confirm") {
-    const price = buyFlow.price != null ? buyFlow.price : Math.max(1, p.prezzoConsigliato);
+    const price = buyFlow.price != null ? buyFlow.price : 1;
     return `<div class="confirm-box">Assegni <b>${esc(p.nome)}</b><br>a <b>${esc(buyFlow.team)}</b> per <b>${price}</b> crediti?</div>
       <div class="buy-actions">
         <button class="btn me" data-confirm="1">✓ OK, conferma</button>
@@ -573,6 +573,7 @@ function renderListone() {
     valore: (a, b) => b.valoreBase - a.valoreBase,
     qi: (a, b) => b.qi - a.qi,
     nome: (a, b) => a.nome.localeCompare(b.nome),
+    squadra: (a, b) => a.squadra.localeCompare(b.squadra) || a.nome.localeCompare(b.nome),
   }[ui.sort];
   list.sort(cmp);
   el.innerHTML = list.slice(0, 300).map((p) => `
