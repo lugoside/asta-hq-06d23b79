@@ -55,10 +55,10 @@ jobs:
       # Genera i dati RIDOTTI e li pubblica nel repo LITE (serve il secret LITE_REPO_TOKEN).
       # Se il secret non c'è, lo step si salta senza far fallire il workflow.
       - name: Pubblica players_lite.json nel repo LITE
-        if: ${{ secrets.LITE_REPO_TOKEN != '' }}
         env:
           LITE_TOKEN: ${{ secrets.LITE_REPO_TOKEN }}
         run: |
+          if [ -z "$LITE_TOKEN" ]; then echo "Secret LITE_REPO_TOKEN assente: salto la pubblicazione LITE."; exit 0; fi
           git clone --depth 1 "https://x-access-token:${LITE_TOKEN}@github.com/lugoside/fantaasta-lite.git" lite-repo
           LITE_OUT=lite-repo/docs/data node pipeline/build_lite.mjs
           cd lite-repo
