@@ -11,7 +11,7 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v34"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v35"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -195,13 +195,14 @@ function emitMove(mv) {
   return m;
 }
 async function pushMoveToCloud(m) {
-  const url = movesUrl(); if (!SYNC.on || !url) return;
+  const url = movesUrl(); if (!SYNC.on || !url || m.posted) return; // già inviata/in invio → niente duplicati
+  m.posted = true; saveMoves();                                     // guardia OTTIMISTICA: blocca push concorrenti
   const body = { uid: m.uid, type: m.type, playerId: m.playerId, byDevice: m.byDevice, ts: { ".sv": "timestamp" } };
   for (const k of ["team", "price", "nome", "ruolo", "squadra"]) if (m[k] != null) body[k] = m[k];
   try {
     await fetch(url + ".json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    m.posted = true; saveMoves(); setSyncStatus("ok");
-  } catch { setSyncStatus("err"); } // resta posted=false → ritentata al prossimo giro
+    setSyncStatus("ok");
+  } catch { m.posted = false; saveMoves(); setSyncStatus("err"); }  // ripristina per ritentare
 }
 async function flushPending() {
   if (!SYNC.on) return;
