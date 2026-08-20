@@ -11,7 +11,7 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
 };
-const APP_VERSION = "v32"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v33"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -326,7 +326,7 @@ function connectSSE() {
 function startSync() {
   if (!SYNC.on) return;
   reconcileSync().then(connectSSE);
-  if (!_pollId) _pollId = setInterval(pullOnce, 15000); // rete di sicurezza se l'SSE cade
+  if (!_pollId) _pollId = setInterval(pullOnce, 10000); // rete di sicurezza se l'SSE cade
 }
 function stopSync() {
   for (const es of [_esMoves, _esConfig]) if (es) es.close();
@@ -1248,6 +1248,10 @@ async function init() {
   recompute();
   renderAll();
   if (SYNC.on) startSync();
+  // tornando in primo piano, riallinea SUBITO (mobile sospende SSE/timer in background)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && SYNC.on) { pullOnce(); connectSSE(); }
+  });
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
     // quando un nuovo service worker prende il controllo, ricarica una volta per avere l'ultima versione
