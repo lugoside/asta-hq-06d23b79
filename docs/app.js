@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v44"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v45"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1065,6 +1065,9 @@ function setupTeamDnD() {
 // ---------------------------------------------------------------------------
 const MODULI = { "3-4-3": [3,4,3], "3-5-2": [3,5,2], "4-3-3": [4,3,3], "4-4-2": [4,4,2], "4-5-1": [4,5,1], "5-3-2": [5,3,2], "5-4-1": [5,4,1] };
 const _deac = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// nome breve per le righe compatte: i nostri nomi sono "Cognome Nome" → tengo il COGNOME
+// (anche composto, es. "De Ketelaere", "Del Prato"), scartando solo il nome di battesimo finale.
+const shortName = (n) => { const t = String(n || "").trim().split(/\s+/); return t.length > 1 ? t.slice(0, -1).join(" ") : (n || ""); };
 
 function giornataActive() { return formDemo ? formDemo.g : GIORNATA; }
 
@@ -1145,10 +1148,10 @@ function renderFormazione() {
   const xiIds = new Set(xi ? xi.xi.map((p) => p.id) : []);
   let xiHtml = "";
   if (xi) {
-    const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
     // panchina come gli 11: righe per ruolo, dentro ogni ruolo in ordine di prob. di subentro (resa attesa)
     const bench = roster.filter((p) => !xiIds.has(p.id)).sort((a, b) => b._exp - a._exp);
-    const benchLine = (r) => bench.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    const benchLine = (r) => bench.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
     const benchHtml = bench.length ? `<div class="xi-bench">
       <div class="xi-top"><b>Panchina consigliata</b> <span class="meta">(per ruolo · ordine di subentro)</span></div>
       ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
