@@ -255,22 +255,31 @@ def parse_listone(html: str) -> list[dict]:
 
 
 def main():
-    stag = sys.argv[1] if len(sys.argv) > 1 else STAGIONE_DEFAULT
-    url = URL_TMPL.format(stag=stag)
-    print(f"Scarico: {url}")
-    html = fetch_html(url)
-    players = parse_listone(html)
-    if len(players) < 300:
-        raise SystemExit(f"Solo {len(players)} giocatori estratti: la pagina potrebbe essere cambiata. "
-                         f"Controlla pipeline/sources.md.")
-    data_fonte = parse_data_fonte(html)
+    # --solo-extra: NON riscrive il listone (che ora e' rifondato su fanta.it e
+    # versionato in pipeline/listone_base.json), scarica solo le fonti di
+    # ENRICHMENT (infortuni/formazioni/rigoristi/corner). Usato dalla Action.
+    args = [a for a in sys.argv[1:]]
+    solo_extra = "--solo-extra" in args
+    pos = [a for a in args if not a.startswith("--")]
+    stag = pos[0] if pos else STAGIONE_DEFAULT
     os.makedirs(RAW_DIR, exist_ok=True)
-    out = os.path.join(RAW_DIR, "listone.json")
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(players, f, ensure_ascii=False)
-    # sidecar con i metadati della fonte (data di aggiornamento del listone)
-    with open(os.path.join(RAW_DIR, "source_meta.json"), "w", encoding="utf-8") as f:
-        json.dump({"fonteAggiornata": data_fonte, "url": url}, f, ensure_ascii=False)
+    players, data_fonte, out = [], None, os.path.join(RAW_DIR, "listone.json")
+    if solo_extra:
+        print("Modalita' --solo-extra: salto il listone, aggiorno solo le fonti extra.")
+    else:
+        url = URL_TMPL.format(stag=stag)
+        print(f"Scarico: {url}")
+        html = fetch_html(url)
+        players = parse_listone(html)
+        if len(players) < 300:
+            raise SystemExit(f"Solo {len(players)} giocatori estratti: la pagina potrebbe essere cambiata. "
+                             f"Controlla pipeline/sources.md.")
+        data_fonte = parse_data_fonte(html)
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump(players, f, ensure_ascii=False)
+        # sidecar con i metadati della fonte (data di aggiornamento del listone)
+        with open(os.path.join(RAW_DIR, "source_meta.json"), "w", encoding="utf-8") as f:
+            json.dump({"fonteAggiornata": data_fonte, "url": url}, f, ensure_ascii=False)
     # infortunati (tabella statica separata)
     try:
         inf = parse_infortunati(fetch_html(INFORTUNATI_URL))
@@ -319,14 +328,15 @@ def main():
         json.dump(cor, f, ensure_ascii=False)
     print(f"Corner letti: {len(cor)}")
 
-    from collections import Counter
-    print(f"OK: {len(players)} giocatori -> {out}")
-    print(f"Listone aggiornato dalla fonte al: {data_fonte or 'n/d'}")
     print(f"Infortunati letti: {len(inf)}")
     print(f"Voci formazioni lette: {len(form)}")
-    print("Per ruolo:", dict(Counter(p["ruolo"] for p in players)))
-    top = sorted(players, key=lambda p: -p["qi"])[:6]
-    print("Top per valore:", ", ".join(f"{p['nome']}({p['qi']})" for p in top))
+    if not solo_extra:
+        from collections import Counter
+        print(f"OK: {len(players)} giocatori -> {out}")
+        print(f"Listone aggiornato dalla fonte al: {data_fonte or 'n/d'}")
+        print("Per ruolo:", dict(Counter(p["ruolo"] for p in players)))
+        top = sorted(players, key=lambda p: -p["qi"])[:6]
+        print("Top per valore:", ", ".join(f"{p['nome']}({p['qi']})" for p in top))
 
 
 if __name__ == "__main__":

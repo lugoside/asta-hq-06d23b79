@@ -71,27 +71,39 @@ def valore_da_qi(qi: float, ruolo: str) -> float:
     return max(0.0, (qi - QI_REPLACEMENT[ruolo]) * QI_SCALE)
 
 
-# --- valutazione basata sul MERCATO (fonte reale con kapitals/overall) ------
-# Il valore di mercato (kapitals) incorpora già l'expertise della community;
-# lo usiamo come base, con una lieve inclinazione per il rating "overall".
-OVERALL_MID = 6.0  # rating "medio"; sopra alza, sotto abbassa
+# --- valutazione basata sul MERCATO (FVM ufficiale di fantacalcio.it) --------
+# Base del valore = FVM/1000 ("Fanta Valore di Mercato"): l'indice ufficiale che
+# incorpora gia' qualita' e domanda della community. L'FVM grezzo e' pero' troppo
+# "top-heavy" (i big schiacciano tutti): lo COMPRIMIAMO con un esponente < 1 per
+# riportarlo nella scala-prezzo realistica di un'asta 10x500. FVM_EXP=0.58 e'
+# tarato empiricamente sui prezzi verificati sul campo (Lautaro ~139, McTominay
+# ~61, Maignan ~36) con la fonte precedente → la rifondazione su fanta.it
+# mantiene gli stessi prezzi collaudati, cambiando solo la fonte dati.
+FVM_EXP = 0.58
 
-def valore_da_mercato(qi: float, overall: float, ruolo: str) -> float:
-    base = max(0.0, qi - QI_REPLACEMENT[ruolo])  # valore sopra la riserva del ruolo
-    tilt = clamp(1.0 + 0.10 * (overall - OVERALL_MID), 0.7, 1.4) if overall else 1.0
-    return round(base * tilt, 2)
+def valore_da_mercato(mv: float, overall: float = 0.0, ruolo: str = "C") -> float:
+    # mv = FVM ufficiale. `overall`/`ruolo` restano per compatibilita' di firma
+    # ma non incidono (l'FVM incorpora gia' la qualita'); il -1 azzera i filler.
+    return round(max(0.0, max(0.0, mv) ** FVM_EXP - 1.0), 2)
 
 
 def valuta_lista_mercato(players: list[dict]) -> list[dict]:
-    """Valuta con il modello di MERCATO i record che hanno kapitals/overall.
+    """Valuta con il modello di MERCATO.
 
+    Base del valore = **FVM ufficiale di fantacalcio.it** (Fanta Valore di Mercato):
+    un indice di valore ad ampio spettro, coerente per TUTTI i giocatori del
+    listone (anche i "nuovi" senza rating `overall`). Sopra la riserva di ruolo,
+    senza tilt aggiuntivo (l'FVM incorpora gia' la qualita'). `qi` = quotazione
+    ufficiale (QUOT.), usata solo come anchor/titolarita' di fallback e per l'UI.
     Aggiunge valoreBase e (per trasparenza) fmProiettata≈overall, presenzeAttese
     e titolarita stimate da lineupRating (0..3 → 0..1).
     """
     for p in players:
         overall = float(p.get("overall", 0) or 0)
         qi = float(p.get("qi", 1) or 1)
-        p["valoreBase"] = valore_da_mercato(qi, overall, p.get("ruolo", "C"))
+        # valore di mercato = FVM (fallback su qi se assente); niente tilt overall
+        mv = float(p.get("fvm", 0) or 0) or qi
+        p["valoreBase"] = valore_da_mercato(mv, 0, p.get("ruolo", "C"))
         lr = float(p.get("lineupRating", 0) or 0)
         p["titolarita"] = round(clamp(lr / 3.0, TIT_MIN, TIT_MAX), 3) if lr else round(clamp(qi / 30.0, TIT_MIN, TIT_MAX), 3)
         p["fmProiettata"] = round(overall, 2) if overall else None

@@ -1,6 +1,11 @@
 name: update-data
 
-# Rigenera il listone (docs/data/players.json) dalla fonte ufficiale.
+# Rigenera docs/data/players.json in AUTOMATICO dalle fonti PUBBLICHE (no login):
+#  1) fetch_quotazioni.py  -> Quotazioni UFFICIALI di fantacalcio.it (id reali, QUOT, FVM)
+#  2) fetch_sources.py     -> listone fantacalcio-online (nomi completi + overall) + fonti extra
+#  3) build_listone_fanta  -> unisce i due in pipeline/listone_base.json (fanta.it autorevole)
+#  4) build_players.py     -> players.json (valore su FVM + enrichment)
+# Tutto scrapabile senza credenziali. (I trasferiti "fuori lista" restano nel listone: scelta voluta.)
 # - workflow_dispatch: avviabile A MANO, anche da telefono (GitHub app/web → Run workflow)
 # - schedule: ogni mattina, utile nei giorni prima dell'asta
 on:
@@ -27,8 +32,12 @@ jobs:
           python-version: "3.12"
       - name: Installa dipendenze
         run: pip install -r pipeline/requirements.txt
-      - name: Scarica il listone
+      - name: Quotazioni ufficiali fantacalcio.it (id reali, QUOT, FVM)
+        run: python pipeline/fetch_quotazioni.py
+      - name: Listone fantacalcio-online (nomi completi + overall) + fonti extra
         run: python pipeline/fetch_sources.py
+      - name: Rifondi il listone base (unione fanta.it + nomi completi)
+        run: python pipeline/build_listone_fanta.py
       - name: Ricostruisci players.json
         run: python pipeline/build_players.py
       - name: Commit e pubblica (robusto ai race)
@@ -48,7 +57,7 @@ jobs:
             git reset --hard HEAD~1
             git fetch origin main
             git reset --hard origin/main
-            python pipeline/fetch_sources.py
+            python pipeline/build_listone_fanta.py
             python pipeline/build_players.py
           done
           echo "Impossibile pubblicare dopo 5 tentativi."; exit 1

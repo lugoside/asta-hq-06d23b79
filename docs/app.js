@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v40"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v41"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -647,10 +647,10 @@ function renderSquadre() {
     return `<div class="team" data-drop-team="${esc(t.id)}">
       <div class="hd tap" data-team="${esc(t.id)}">
         <span class="nm ${t.isMe ? "me" : ""}">${open ? "▾" : "▸"} ${esc(t.name)}</span>
-        <span class="bud">${s.budgetLeft} <small>/ ${CONFIG.budgetPerTeam} · ${s.count} giocatori</small></span>
+        <span class="bud">${s.budgetLeft} <small>/ ${CONFIG.budgetPerTeam}</small></span>
       </div>
       <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="slotline">${ROLES.map((r) => `<span class="slot ${r}">${r} ${s.slotsRemaining[r]}</span>`).join("")}</div>
+      <div class="slotline">${ROLES.map((r) => `<span class="slot ${r}">${r} ${(CONFIG.roster[r] || 0) - (s.slotsRemaining[r] ?? CONFIG.roster[r])}/${CONFIG.roster[r] || 0}</span>`).join("")}</div>
       ${rosterHtml}
     </div>`;
   }).join("");
@@ -958,6 +958,13 @@ function auctionClosed() {
 function recordPurchase(team) {
   if (auctionClosed()) return;
   const p = boardPlayer(selectedId); if (!p) return;
+  // blocca se la squadra ha già raggiunto il numero massimo di giocatori per quel ruolo
+  const ts = BOARD.teams.find((t) => t.id === team);
+  const max = CONFIG.roster[p.ruolo] || 0;
+  if (ts && ts.slotsRemaining && ts.slotsRemaining[p.ruolo] <= 0) {
+    toast(`${teamName(team)} ha già ${max} ${p.ruolo}: reparto al completo`);
+    return;
+  }
   const input = document.getElementById("priceInput");
   const price = Math.max(1, Math.round(Number(input?.value) || p.prezzoConsigliato));
   // salvo anche nome/ruolo/squadra: l'acquisto resta valido anche se il listone cambia
@@ -1124,10 +1131,10 @@ function wire() {
     if (sd) { applyStep(sd.dataset.sd, Number(sd.dataset.dd)); return; }
     const remP = e.target.closest("[data-remove-purchase]");
     if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
-    const pick = e.target.closest("[data-pick]");
-    if (pick) { selectPlayer(pick.dataset.pick); return; }
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
+    const pick = e.target.closest("[data-pick]");
+    if (pick) { selectPlayer(pick.dataset.pick); return; }
     const step = e.target.closest("[data-step]");
     if (step) { const inp = document.getElementById("priceInput"); const v = Math.max(1, (Number(inp.value) || 1) + Number(step.dataset.step)); inp.value = v; buyFlow.price = v; updateOfferSem(); return; }
     const buy = e.target.closest("[data-buy]");

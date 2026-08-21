@@ -248,3 +248,8 @@ nav.tabs button.on { color: var(--accent2); }
   padding: 10px 16px; border-radius: 20px; z-index: 60; box-shadow: 0 8px 24px rgba(0,0,0,.5);
   opacity: 0; transition: opacity .2s; pointer-events: none; font-size: .88rem; }
 .toast.show { opacity: 1; }
+
+/* i +/- fanno già da stepper: nascondo le frecce native del campo numero (doppione) */
+#priceInput::-webkit-outer-spin-button,
+#priceInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#priceInput { -moz-appearance: textfield; appearance: textfield; }

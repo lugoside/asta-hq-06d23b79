@@ -23,6 +23,9 @@ import unicodedata
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# listone BASE rifondato su fanta.it (versionato, prodotto da build_listone_fanta.py):
+# ha la precedenza sul grezzo scaricato da fantacalcio-online (raw/, gitignored).
+LISTONE_BASE = os.path.join(HERE, "listone_base.json")
 RAW = os.path.join(HERE, "raw", "listone.json")
 OUT_DIR = os.path.join(HERE, "..", "docs", "data")
 OUT_PLAYERS = os.path.join(OUT_DIR, "players.json")
@@ -222,9 +225,11 @@ def annota_rigoristi(players: list[dict]) -> None:
 
 
 def carica_raw() -> list[dict] | None:
-    if os.path.exists(RAW):
-        with open(RAW, encoding="utf-8") as f:
-            return json.load(f)
+    # preferisci il listone rifondato su fanta.it (versionato); fallback sul grezzo scaricato
+    for path in (LISTONE_BASE, RAW):
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
     return None
 
 
@@ -257,7 +262,7 @@ def main():
     is_reale = raw is not None
     if is_reale:
         players = raw
-        fonte = "fantacalcio-online.com — listone ufficiale 2026/27"
+        fonte = "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online"
     else:
         players = genera_demo()
         fonte = "DEMO generato (dati non reali) — sostituire con il listone ufficiale"
@@ -325,8 +330,10 @@ def main():
         prev = prev_sources.get(name, {})
         return {"fp": fp, "lastChanged": now_iso if fp != prev.get("fp") else prev.get("lastChanged", now_iso)}
 
+    _listone_fp = (hashlib.sha1(open(LISTONE_BASE, "rb").read()).hexdigest()[:12]
+                   if os.path.exists(LISTONE_BASE) else (fonte_aggiornata or _fp("listone.json")))
     sources = {
-        "Listone": _status("Listone", fonte_aggiornata or _fp("listone.json")),
+        "Listone": _status("Listone", _listone_fp),
         "Infortuni": _status("Infortuni", _fp("infortunati.json")),
         "Formazioni": _status("Formazioni", _fp("formazioni.json")),
         "Rigori/Punizioni": _status("Rigori/Punizioni", _fp("rigoristi.json")),
