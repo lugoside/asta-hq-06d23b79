@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v42"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v43"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1146,9 +1146,13 @@ function renderFormazione() {
   let xiHtml = "";
   if (xi) {
     const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    const bench = roster.filter((p) => !xiIds.has(p.id)).sort((a, b) => b._exp - a._exp);
+    const benchHtml = bench.length ? `<div class="xi-bench"><b>Panchina consigliata</b> <span class="meta">(ordine di subentro)</span>
+      <div class="bench-list">${bench.map((p) => `<span class="bench-item"><span class="rp ${p.ruolo}">${p.ruolo}</span>${esc(p.nome.split(" ")[0])}</span>`).join("")}</div></div>` : "";
     xiHtml = `<div class="fmz-xi">
-      <div class="xi-top"><b>XI consigliato</b> · modulo <b>${xi.mod}</b> <span class="meta">(resa attesa ${xi.tot.toFixed(1)})</span></div>
+      <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b> <span class="meta">(resa attesa ${xi.tot.toFixed(1)})</span></div>
       ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
+      ${benchHtml}
     </div>`;
   }
 
@@ -1168,10 +1172,13 @@ function renderFormazione() {
     const probTxt = p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
       : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟡"} titolare ${perc}` : `⚪ riserva ${perc} (subentro)`)
       : "⚪ non tra i probabili";
-    const matchTxt = m ? `vs ${esc(m.opponent)} ${m.home ? "🏠" : "✈️"}` : "";
-    const statTxt = st ? `${st.pg} pres · MV ${(st.mv || 0).toFixed ? st.mv.toFixed(2) : st.mv} · FM ${(st.mfv || 0).toFixed ? st.mfv.toFixed(2) : st.mfv} · ${st.gol}⚽${st.gs ? " · " + st.gs + "🥅sub" : ""}${st.ass ? " · " + st.ass + "🅰" : ""}` : "nessuna statistica";
+    const club = esc(String(p.squadra).toUpperCase());  // club del giocatore in MAIUSCOLO
+    // sempre "Casa - Trasferta": se il club gioca fuori, prima l'avversario (casa) poi il club
+    const matchTxt = m ? (m.home ? `${club} - ${esc(m.opponent)} 🏠` : `${esc(m.opponent)} - ${club} ✈️`) : club;
+    const fmt = (n) => (typeof n === "number" ? n.toFixed(2) : (n || 0));
+    const statTxt = st ? `${st.pg} pres · MV ${fmt(st.mv)} · FM ${fmt(st.mfv)} · ${st.gol} gol${st.gs ? ` · ${st.gs} subiti` : ""}${st.ass ? ` · ${st.ass} assist` : ""}` : "nessuna statistica";
     return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}">
-      <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(p.nome)}</span><span class="fc-team">${esc(p.squadra)}${matchTxt ? " · " + matchTxt : ""}</span>${inXI ? `<span class="xi-badge">XI</span>` : ""}</div>
+      <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(p.nome)}</span><span class="fc-team">${matchTxt}</span>${inXI ? `<span class="xi-badge">11</span>` : ""}</div>
       <div class="fc-prob">${probTxt}</div>
       <div class="fc-stat">${statTxt}</div>
       ${p._note ? `<div class="fc-note">💬 ${esc(p._note)}</div>` : ""}

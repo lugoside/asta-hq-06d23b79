@@ -263,6 +263,10 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-xi { margin: 8px 14px; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
 .fmz-xi .xi-top { font-size: .92rem; margin-bottom: 8px; }
 .fmz-xi .xi-line { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .86rem; }
+.xi-bench { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: .82rem; }
+.bench-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bench-item { display: inline-flex; align-items: center; gap: 5px; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px 3px 4px; font-size: .78rem; }
+.bench-item .rp { width: 18px; height: 18px; font-size: .6rem; }
 .fmz-reparto { margin: 14px 14px 0; }
 .rep-title { display: flex; align-items: center; gap: 8px; font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 6px; }
 .fmz-card { position: relative; background: var(--card); border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 9px 12px; margin-bottom: 8px; }
