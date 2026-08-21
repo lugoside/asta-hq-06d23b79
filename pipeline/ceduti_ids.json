@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "fonte": "Excel ufficiale fantacalcio.it 2026/27 — foglio Ceduti",
+    "aggiornato": "2026-08-21",
+    "nota": "fantaId da escludere dal listone: la pagina pubblica scrapata li elenca ancora sotto l ex-squadra, l Excel li sposta in Ceduti. Rinfrescare quando si scarica un nuovo Excel."
+  },
+  "ids": [
+    "6641",
+    "2297",
+    "4929",
+    "2401",
+    "6523",
+    "5427",
+    "787",
+    "6663",
+    "7211",
+    "4772",
+    "7346",
+    "7407",
+    "7468",
+    "6245",
+    "7164",
+    "6984",
+    "5485",
+    "2531",
+    "6643",
+    "383",
+    "7158"
+  ],
+  "giocatori": [
+    "Suzuki (Parma)",
+    "Rossi F. (Atalanta)",
+    "Ciocci (Cagliari)",
+    "Fruchtl (Lecce)",
+    "Samooja (Lecce)",
+    "Gutierrez (Napoli)",
+    "Djimsiti (Atalanta)",
+    "Circati (Parma)",
+    "Athekame (Milan)",
+    "Angelino (Roma)",
+    "Raterink (Cagliari)",
+    "Cuenca A. (Como)",
+    "Gelli J. (Frosinone)",
+    "Vogliacco (Genoa)",
+    "Perez M. (Lecce)",
+    "Ondrejka (Parma)",
+    "Bjarkason (Venezia)",
+    "Lukaku (Napoli)",
+    "Dallinga (Bologna)",
+    "Petagna (Monza)",
+    "Moro L. (Sassuolo)"
+  ]
+}

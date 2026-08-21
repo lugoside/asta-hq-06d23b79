@@ -92,6 +92,18 @@ def main():
     args = ap.parse_args()
 
     fanta = load_fanta_json(args.fonte) if args.fonte.lower().endswith(".json") else load_fanta_full(args.fonte)
+
+    # esclusione CEDUTI: la pagina pubblica scrapata elenca i ceduti sotto la ex-squadra,
+    # mentre l'Excel ufficiale li sposta nel foglio "Ceduti". Lista id in pipeline/ceduti_ids.json
+    # (da rinfrescare quando si scarica un nuovo Excel; vedi memoria progetto).
+    ced_path = os.path.join(HERE, "ceduti_ids.json")
+    if os.path.exists(ced_path):
+        ced = json.load(open(ced_path, encoding="utf-8"))
+        ceduti = set(map(str, ced.get("ids", ced) if isinstance(ced, dict) else ced))
+        n0 = len(fanta)
+        fanta = [f for f in fanta if str(f["id"]) not in ceduti]
+        print(f"  esclusi {n0 - len(fanta)} ceduti (pipeline/ceduti_ids.json)")
+
     old = json.load(open(args.old, encoding="utf-8"))
 
     # match: per ogni giocatore VECCHIO trova la miglior riga fanta (top score);
