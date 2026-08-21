@@ -26,8 +26,16 @@ permissions:
   contents: write
 
 jobs:
+  # Sul push serve ALMENO un job che riesce, altrimenti GitHub crea una run vuota
+  # "No jobs were run" marcata come FALLITA (→ mail di fallimento). Questo mini-job
+  # gira solo sul push e fa un echo: la run del push risulta "success", niente mail.
+  skip-on-push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Push: nessun aggiornamento dati. Il workflow gira solo su schedule o avvio manuale."
   update:
-    # sul push NON facciamo nulla (evita le run fallite "No jobs were run"): gira solo su schedule/manuale
+    # l'aggiornamento vero NON gira sul push: solo schedule / workflow_dispatch
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
