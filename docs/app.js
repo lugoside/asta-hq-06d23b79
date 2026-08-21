@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v49"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v50"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -948,8 +948,8 @@ function updateRosterSum() {
 function updateSplitSum() {
   const p = CONFIG.splitPct; const tot = p.P + p.D + p.C + p.A;
   const el = document.getElementById("splitSum");
-  if (el) el.innerHTML = `Totale ${tot}% (normalizzato automaticamente). In crediti: ` +
-    ROLES.map((r) => `${r} ~${Math.round((p[r] / tot) * leagueTotals(effectiveConfig()).totalBudget)}`).join(" · ");
+  if (el) el.innerHTML = `Totale ${tot}% (normalizzato automaticamente). In crediti per la tua rosa (su ${CONFIG.budgetPerTeam}): ` +
+    ROLES.map((r) => `${r} ~${Math.round((p[r] / tot) * CONFIG.budgetPerTeam)}`).join(" · ");
 }
 
 // ---------------------------------------------------------------------------
