@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v46"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v47"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -613,19 +613,23 @@ function renderListone() {
   const cmp = {
     consigliato: (a, b) => b.prezzoConsigliato - a.prezzoConsigliato,
     valore: (a, b) => b.valoreBase - a.valoreBase,
-    qi: (a, b) => b.qi - a.qi,
+    qi: (a, b) => (b.qa ?? b.qi ?? 0) - (a.qa ?? a.qi ?? 0),  // quotazione ATTUALE
     nome: (a, b) => a.nome.localeCompare(b.nome),
     squadra: (a, b) => a.squadra.localeCompare(b.squadra) || a.nome.localeCompare(b.nome),
   }[ui.sort];
   list.sort(cmp);
-  el.innerHTML = list.slice(0, 300).map((p) => `
+  el.innerHTML = list.slice(0, 300).map((p) => {
+    // statistiche stagionali (da giornata.json, per fantaId) — mostrate solo a stagione avviata
+    const gs = GIORNATA && GIORNATA.stats ? GIORNATA.stats[String(p.fantaId)] : null;
+    const stat = gs && gs.pg > 0 ? ` · ${gs.pg}p · MV ${(+gs.mv).toFixed(1)} · FM ${(+gs.mfv).toFixed(1)}${gs.gol ? ` · ${gs.gol}g` : ""}${gs.ass ? ` · ${gs.ass}a` : ""}${gs.gs ? ` · ${gs.gs}gs` : ""}` : "";
+    return `
     <div class="row ${p.taken ? "taken" : ""}" data-pick="${p.id}">
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
       <div class="grow"><div class="nome">${p.infortunato ? "🩹 " : ""}${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)} · ${p.tier} · Qi ${p.qi} · val ${Math.round(p.valoreBase)}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank === 1 ? " · ⚽" : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+        <div class="meta">${esc(p.squadra)} · ${p.tier} · Quot ${p.qa ?? p.qi} · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank === 1 ? " · ⚽" : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
       <span class="price">${p.taken ? p.takenPrice : p.prezzoConsigliato}</span>
-    </div>`).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
+    </div>`; }).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
 
 // ---- SQUADRE ----
@@ -1120,7 +1124,7 @@ function renderFormazione() {
   if (formDemo) roster = formDemo.roster;
   else roster = PURCHASES.filter((pu) => pu.team === MY_TEAM).map((pu) => {
     const pl = PLAYERS.find((x) => x.id === pu.playerId) || { id: pu.playerId, nome: pu.nome || pu.playerId, ruolo: pu.ruolo || "C", squadra: pu.squadra || "?" };
-    return { id: pl.id, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
+    return { id: pl.id, fantaId: pl.fantaId, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
   });
 
   // in uso normale nessun pulsante demo; se la demo è attiva (via URL) mostro solo l'uscita
@@ -1138,8 +1142,9 @@ function renderFormazione() {
 
   // arricchisci ogni giocatore con stat, probabile, match, resa, etichetta
   roster.forEach((p) => {
-    p._st = (g.stats || {})[p.id] || null;
-    p._prob = (g.probabili || {})[p.id] || null;
+    const k = String(p.fantaId ?? p.id);  // giornata.json è chiavato sul fantaId
+    p._st = (g.stats || {})[k] || null;
+    p._prob = (g.probabili || {})[k] || null;
     p._match = (g.teamMatch || {})[p.squadra] || null;
     p._exp = expScore(p._st, p._prob, p.infortunato);
     p._lab = labelFor(p._prob, p.infortunato);
@@ -1203,18 +1208,19 @@ function buildFormDemo() {
   (PLAYERS.length ? PLAYERS : []).forEach((p) => pool[p.ruolo] && pool[p.ruolo].push(p));
   const need = { P: 3, D: 8, C: 8, A: 6 };
   const roster = [];
-  for (const r of ROLES) pick(pool[r], need[r]).forEach((p) => roster.push({ id: p.id, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra, infortunato: Math.random() < 0.08 }));
+  for (const r of ROLES) pick(pool[r], need[r]).forEach((p) => roster.push({ id: p.id, fantaId: p.fantaId, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra, infortunato: Math.random() < 0.08 }));
   const stats = {}, probabili = {}, teamMatch = {}, commento = {};
   const avversari = ["Inter", "Milan", "Juventus", "Napoli", "Roma", "Lazio", "Atalanta", "Bologna"];
   roster.forEach((p) => {
+    const k = String(p.fantaId ?? p.id);  // stessa chiave usata in render (fantaId)
     const pg = Math.floor(Math.random() * 16);
     const mv = +(5.5 + Math.random() * 1.6).toFixed(2);
     const bonus = p.ruolo === "A" ? Math.random() * 1.8 : p.ruolo === "C" ? Math.random() * 1.2 : Math.random() * 0.5;
-    stats[p.id] = { pg, mv, mfv: +(mv + bonus).toFixed(2), gol: p.ruolo === "P" ? 0 : Math.floor(Math.random() * (p.ruolo === "A" ? 9 : 4)), gs: p.ruolo === "P" ? Math.floor(Math.random() * 14) : 0, ass: Math.floor(Math.random() * 5), rigSeg: 0, rigCal: 0, rp: 0, amm: Math.floor(Math.random() * 5), esp: 0 };
+    stats[k] = { pg, mv, mfv: +(mv + bonus).toFixed(2), gol: p.ruolo === "P" ? 0 : Math.floor(Math.random() * (p.ruolo === "A" ? 9 : 4)), gs: p.ruolo === "P" ? Math.floor(Math.random() * 14) : 0, ass: Math.floor(Math.random() * 5), rigSeg: 0, rigCal: 0, rp: 0, amm: Math.floor(Math.random() * 5), esp: 0 };
     const roll = Math.random();
-    if (roll < 0.55) probabili[p.id] = { status: "titolare", perc: 75 + Math.floor(Math.random() * 26), conf: "alta", ruolo: p.ruolo };
-    else if (roll < 0.75) probabili[p.id] = { status: "titolare", perc: 50 + Math.floor(Math.random() * 25), conf: "media", ruolo: p.ruolo };
-    else probabili[p.id] = { status: "riserva", perc: 5 + Math.floor(Math.random() * 60), conf: "media", ruolo: p.ruolo };
+    if (roll < 0.55) probabili[k] = { status: "titolare", perc: 75 + Math.floor(Math.random() * 26), conf: "alta", ruolo: p.ruolo };
+    else if (roll < 0.75) probabili[k] = { status: "titolare", perc: 50 + Math.floor(Math.random() * 25), conf: "media", ruolo: p.ruolo };
+    else probabili[k] = { status: "riserva", perc: 5 + Math.floor(Math.random() * 60), conf: "media", ruolo: p.ruolo };
     if (!teamMatch[p.squadra]) { const opp = avversari.filter((t) => t !== p.squadra); teamMatch[p.squadra] = { opponent: opp[Math.floor(Math.random() * opp.length)], home: Math.random() < 0.5 }; }
     commento[p.squadra] = (commento[p.squadra] || "") + `${p.nome} ${["è in buona condizione.", "recupera e s'avvia verso una maglia.", "è in ballottaggio fino all'ultimo.", "parte favorito per una maglia.", "potrebbe rifiatare."][Math.floor(Math.random() * 5)]} `;
   });

@@ -27,10 +27,10 @@ import json, os, argparse, unicodedata, re, html
 import openpyxl
 import build_crosswalk as B  # riusa norm() e match()
 
-def _fanta_record(fid, nome_raw, sq_raw, ruolo, mantra, fvm, quot):
+def _fanta_record(fid, nome_raw, sq_raw, ruolo, mantra, fvm, quot, qa=None):
     """Costruisce un record 'fanta' con i campi per il match (sur/ini/surc)."""
     f = {"id": fid, "nome_raw": ihtml_unescape(str(nome_raw)), "sq_raw": sq_raw,
-         "ruolo": str(ruolo), "mantra": mantra or "", "fvm": fvm, "quot": quot,
+         "ruolo": str(ruolo), "mantra": mantra or "", "fvm": fvm, "quot": quot, "qa": qa if qa is not None else quot,
          "nome": str(nome_raw), "sq": B.norm(sq_raw)}
     toks = B.norm(f["nome"]).split()
     if toks and len(toks[-1]) == 1:
@@ -50,7 +50,7 @@ def load_fanta_json(path):
     Record attesi: {id, nome, squadra, ruolo, qi, fvm}. Nessun 'fuori lista' qui."""
     data = json.load(open(path, encoding="utf-8"))
     return [_fanta_record(str(p["id"]), p["nome"], p["squadra"], p["ruolo"], p.get("ruoloMantra", ""),
-                          p.get("fvm", 1), p.get("qi", 1)) for p in data]
+                          p.get("fvm", 1), p.get("qi", 1), p.get("qa", p.get("qi", 1))) for p in data]
 
 
 def load_fanta_full(xlsx):
@@ -67,7 +67,7 @@ def load_fanta_full(xlsx):
             continue
         f = {"id": r[0], "nome_raw": html.unescape(str(r[1])), "sq_raw": r[3],
              "ruolo": str(r[5]), "mantra": r[6] or "",
-             "fvm": r[10] or 1, "quot": r[11] or 1,
+             "fvm": r[10] or 1, "quot": r[11] or 1, "qa": r[11] or 1,
              "nome": str(r[1]), "sq": B.norm(r[3])}
         toks = B.norm(f["nome"]).split()
         if toks and len(toks[-1]) == 1:
@@ -112,7 +112,8 @@ def main():
         fid = f["id"]
         if fid in claimed:
             o = dict(claimed[fid])  # copia del record vecchio (nome completo, overall, ecc.)
-            o["qi"] = f["quot"]           # quotazione UFFICIALE fanta.it
+            o["qi"] = f["quot"]           # quotazione INIZIALE ufficiale fanta.it
+            o["qa"] = f["qa"]             # quotazione ATTUALE ufficiale fanta.it
             o["fvm"] = f["fvm"]           # FVM UFFICIALE
             o["ruolo"] = f["ruolo"]       # RUOLO autorevole di lega (fanta.it), non il nostro
             o["ruoloMantra"] = f["mantra"]
@@ -122,7 +123,7 @@ def main():
             listone.append({
                 "id": f"f{fid}", "nome": f["nome_raw"], "squadra": f["sq_raw"],
                 "ruolo": f["ruolo"], "ruoloMantra": f["mantra"],
-                "qi": f["quot"], "fvm": f["fvm"], "overall": None,
+                "qi": f["quot"], "qa": f["qa"], "fvm": f["fvm"], "overall": None,
                 "bonusAtteso": 0.0, "lineupRating": None, "isNuovo": True,
                 "stats2526": {}, "note": "", "fantaId": fid,
             })

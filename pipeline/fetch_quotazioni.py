@@ -49,6 +49,7 @@ def parse_quotazioni(html: str) -> list[dict]:
         role = re.search(r'class="role"\s+data-value="([a-z])"', r)
         name = re.search(r'player-name player-link"[^>]*>\s*<span>([^<]+)</span>', r)
         qi = re.search(r'data-col-key="c_qi">\s*([\d.]+)', r)
+        qa = re.search(r'data-col-key="c_qa">\s*([\d.]+)', r)   # quotazione ATTUALE (cambia in stagione)
         fvm = re.search(r'data-col-key="c_fvm">\s*([\d.]+)', r)
         if not (idm and name and role and qi and fvm):
             continue
@@ -58,6 +59,7 @@ def parse_quotazioni(html: str) -> list[dict]:
             "squadra": teams.get(tid.group(1) if tid else "", (tid.group(1) if tid else "")),
             "ruolo": ROLE.get(role.group(1), "C"),
             "qi": int(float(qi.group(1))),
+            "qa": int(float(qa.group(1))) if qa else int(float(qi.group(1))),
             "fvm": int(float(fvm.group(1))),
         })
     return out

@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 const SRC = "docs/data";
 const OUT = process.env.LITE_OUT || "../Fantacalcio-lite/docs/data";
 // qi = quotazione iniziale UFFICIALE di fantacalcio.it (dato PUBBLICO, non un vantaggio); niente valoreBase/tier/fvm
-const KEEP = ["id", "nome", "squadra", "ruolo", "isNuovo", "qi"];
+const KEEP = ["id", "nome", "squadra", "ruolo", "isNuovo", "qi", "qa"];
 
 const players = JSON.parse(readFileSync(`${SRC}/players.json`, "utf8"));
 const lite = players.map((p) => {
