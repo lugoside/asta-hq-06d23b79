@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v47"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v48"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -627,7 +627,7 @@ function renderListone() {
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
       <div class="grow"><div class="nome">${p.infortunato ? "🩹 " : ""}${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)} · ${p.tier} · Quot ${p.qa ?? p.qi} · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank === 1 ? " · ⚽" : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+        <div class="meta">${esc(p.squadra)} · ${p.tier} · Quot ${p.qa ?? p.qi} · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank ? ` · ⚽${p.rigoreRank}°` : ""}${p.punizioneRank ? ` · 🎯${p.punizioneRank}°` : ""}${p.cornerRank ? ` · 🚩${p.cornerRank}°` : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
       <span class="price">${p.taken ? p.takenPrice : p.prezzoConsigliato}</span>
     </div>`; }).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
