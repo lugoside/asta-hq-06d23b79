@@ -1,2 +1,4 @@
-# La pipeline usa solo la libreria standard di Python (urllib, gzip, json, re).
-# Nessuna dipendenza esterna necessaria.
+# La pipeline usa quasi solo la libreria standard di Python (urllib, gzip, json, re).
+# Unica dipendenza esterna: openpyxl, usata da build_crosswalk/build_listone_fanta
+# per leggere l'export .xlsx di lega (percorso alternativo allo scrape .json).
+openpyxl
