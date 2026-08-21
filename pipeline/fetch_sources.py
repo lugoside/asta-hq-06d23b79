@@ -49,6 +49,26 @@ def fetch_html(url: str) -> str:
     return data.decode("utf-8", "ignore")
 
 
+def latest_rigoristi_url() -> str:
+    """La Gazzetta pubblica gli articoli rigoristi a URL DATATI (…/rigoristi/GG-MM-AAAA/…):
+    invece di fissare una data (che prima o poi resta indietro), leggo l'indice e seguo
+    l'articolo Serie A con la data più recente. Fallback: RIGORISTI_URL fisso."""
+    base = "https://www.gazzetta.it"
+    try:
+        idx = fetch_html(base + "/calcio/fantanews/strumenti-fantacalcio/rigoristi/")
+        best = None
+        rx = r'href="(/calcio/fantanews/strumenti-fantacalcio/rigoristi/(\d{2})-(\d{2})-(\d{4})/[^"]*serie-a[^"]*\.shtml)"'
+        for path, dd, mm, yy in re.findall(rx, idx):
+            key = (int(yy), int(mm), int(dd))
+            if best is None or key > best[0]:
+                best = (key, path)
+        if best:
+            return base + best[1]
+    except Exception as e:
+        print("Attenzione: indice rigoristi non letto, uso URL fisso:", e)
+    return RIGORISTI_URL
+
+
 def _prop(block: str, name: str) -> str:
     m = re.search(r'data-prop-name="' + re.escape(name) + r'"[^>]*>([^<]*)<', block)
     return m.group(1).strip() if m else ""
@@ -308,9 +328,11 @@ def main():
     with open(os.path.join(RAW_DIR, "formazioni.json"), "w", encoding="utf-8") as f:
         json.dump(form, f, ensure_ascii=False)
 
-    # rigoristi (fantacalcio.it)
+    # rigoristi + punizioni (Gazzetta) — segue automaticamente l'articolo Serie A più recente
     try:
-        rig = parse_rigoristi(fetch_html(RIGORISTI_URL))
+        rig_url = latest_rigoristi_url()
+        print(f"Rigoristi: uso {rig_url}")
+        rig = parse_rigoristi(fetch_html(rig_url))
     except Exception as e:
         rig = []
         print("Attenzione: rigoristi non letti:", e)
