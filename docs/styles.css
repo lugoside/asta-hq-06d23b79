@@ -76,10 +76,11 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
 .tier.Top { color: #fbbf24; border-color: #fbbf24; }
 .tier.Semi-top { color: var(--c); border-color: var(--c); }
 
-.price-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 16px 0; text-align: center; }
+.price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(66px, 1fr)); gap: 10px; margin: 16px 0; text-align: center; }
 .price-grid .box { background: var(--card2); border-radius: 12px; padding: 10px 6px; }
 .price-grid .box .v { font-size: 1.6rem; font-weight: 800; line-height: 1; }
 .price-grid .box .v.big { color: var(--accent2); }
+.price-grid .box .v.over { color: #f87171; }
 .price-grid .box .l { font-size: .62rem; color: var(--muted); text-transform: uppercase; margin-top: 4px; letter-spacing: .4px; }
 
 .semaforo { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-weight: 600; margin-bottom: 14px; }

@@ -151,6 +151,7 @@ export function computeState(players, purchases, config = DEFAULT_CONFIG) {
         spent: 0,
         count: 0,
         filledByRole: { P: 0, D: 0, C: 0, A: 0 },
+        spentByRole: { P: 0, D: 0, C: 0, A: 0 },
       });
     }
     return teams.get(id);
@@ -170,6 +171,7 @@ export function computeState(players, purchases, config = DEFAULT_CONFIG) {
     t.spent += price;
     t.count += 1;
     t.filledByRole[ruolo] += 1;
+    t.spentByRole[ruolo] += price;
   }
 
   // arricchisci ogni squadra con budget e slot residui
@@ -191,6 +193,7 @@ export function computeState(players, purchases, config = DEFAULT_CONFIG) {
       count: t.count,
       slotsRemaining,
       slotsRemainingTotal,
+      spentByRole: t.spentByRole,
       // credito massimo teorico su un singolo giocatore lasciando 1 per ogni altro slot
       maxBid: Math.max(0, budgetLeft - Math.max(0, slotsRemainingTotal - 1)),
     });
@@ -270,8 +273,21 @@ export function marketPrices(players, state, config = DEFAULT_CONFIG) {
       const price = 1 + discretionary * share;
       prices.set(p.id, Math.max(1, Math.round(price)));
     });
-    // i "filler" (oltre gli slot disponibili nel ruolo) valgono il minimo
-    fillers.forEach((p) => prices.set(p.id, 1));
+    // i "filler" (oltre gli slot disponibili nel ruolo) NON crollano a 1 di colpo:
+    // pavimento MORBIDO ancorato all'ultimo titolare, decrescente col valore. Chi ha
+    // valore ≈ a quello del confine prende ≈ lo stesso prezzo; i valori bassi → 1.
+    // Non tocca titolari/pool (i filler non entrano nel budget dei titolari).
+    const lastStarter = starters[starters.length - 1];
+    const pBoundary = lastStarter ? (prices.get(lastStarter.id) || 1) : 1;
+    const vBoundary = lastStarter ? Math.max(0.01, lastStarter.valoreBase) : 1;
+    // tetto = quotazione ufficiale (qa): un giocatore in sovrannumero non vale più
+    // della sua quotazione, così i ruoli "larghi" (A) non gonfiano i filler.
+    fillers.forEach((p) => {
+      const ratio = Math.max(0, p.valoreBase) / vBoundary;
+      const soft = Math.round(pBoundary * Math.pow(ratio, config.concentration));
+      const qaCap = p.qa ?? p.qi ?? pBoundary;
+      prices.set(p.id, Math.max(1, Math.min(pBoundary, soft, qaCap)));
+    });
   }
   return prices;
 }

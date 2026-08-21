@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v50"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v51"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -509,12 +509,17 @@ function renderAsta() {
     else { const v = offerVerdict(p, offer); semClass = v.cls; semTxt = v.txt; }
     const adjPct = (CONFIG.adjust && CONFIG.adjust[p.id]) || 0;
     const pnote = (CONFIG.notes && CONFIG.notes[p.id]) || "";
+    // "tuo max reparto": crediti ancora previsti dal tuo piano di ripartizione per il ruolo
+    const _sp = CONFIG.splitPct, _spTot = (_sp.P + _sp.D + _sp.C + _sp.A) || 1;
+    const _roleBudget = Math.round((_sp[p.ruolo] / _spTot) * CONFIG.budgetPerTeam);
+    const _roleSpent = (BOARD.me && BOARD.me.spentByRole && BOARD.me.spentByRole[p.ruolo]) || 0;
+    const roleLeft = _roleBudget - _roleSpent;
     card.innerHTML = `
       <div class="top">
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
         <div class="grow">
           <div class="nome">${esc(p.nome)}</div>
-          <div class="sub">${esc(p.squadra)} · ${RUOLO_NOME[p.ruolo]} · valore ${p.valoreBase}</div>
+          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]} · valore ${p.valoreBase}</div>
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
@@ -523,6 +528,7 @@ function renderAsta() {
         <div class="box"><div class="v big">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
         <div class="box"><div class="v">${BOARD.me.maxBid}</div><div class="l">tuo max</div></div>
+        <div class="box" title="Crediti ancora previsti dal tuo piano di ripartizione per questo reparto (${_roleBudget} pianificati − ${_roleSpent} spesi)"><div class="v${roleLeft <= 0 ? " over" : ""}">${roleLeft}</div><div class="l">tuo max reparto</div></div>
       </div>
       <div class="srcinfo">📊 Rating ${p.overall ?? "—"} · Bonus attesi ${p.bonusAtteso ?? "—"} · Titolarità ${Math.round((p.titolarita || 0) * 100)}%${p.formazione ? ` · ${FORM_LABEL[p.formazione]}` : ""}${p.rigoreRank ? ` · ⚽ Rigorista${p.rigoreRank > 1 ? " (" + p.rigoreRank + "ª)" : ""}` : ""}${p.punizioneRank ? ` · 🎯 Punizioni${p.punizioneRank > 1 ? " (" + p.punizioneRank + "ª)" : ""}` : ""}${p.cornerRank ? ` · 🚩 Corner${p.cornerRank > 1 ? " (" + p.cornerRank + "ª)" : ""}` : ""}${p.goalBand ? ` · 🗞️ goal.com ${GOAL_BAND_LABEL[p.goalBand]}${p.goalFactor && p.goalFactor !== 1 ? ` <span class="adjv">${p.goalFactor > 1 ? "+" : ""}${Math.round((p.goalFactor - 1) * 100)}%</span>` : ""}` : ""}${adjPct ? ` · <span class="adjv">aggiust. ${adjPct > 0 ? "+" : ""}${adjPct}%</span>` : ""}${pnote ? `<br>📝 ${esc(pnote)}` : ""}</div>
       <div class="semaforo ${semClass}" id="offerSem"><span class="dot"></span>${semTxt}</div>
