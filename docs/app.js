@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG, ROLES, MY_TEAM, computeBoard, leagueTotals, reduceMoves
 // ---------------------------------------------------------------------------
 const LS = {
   config: "fa_config", purchases: "fa_purchases", fav: "fa_favorites",
-  players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history",
+  players: "fa_players_cache", meta: "fa_meta_cache", history: "fa_history", giornata: "fa_giornata_cache",
   sync: "fa_sync", syncSeen: "fa_sync_seen", device: "fa_device",
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v41"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v42"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -75,6 +75,8 @@ let PURCHASES = [];                         // derivato: reduceMoves(MOVES) con 
 let FAVORITES = new Set(load(LS.fav, []));  // preferiti: SOLO locali (personali, non condivisi)
 let PLAYERS = [];
 let META = {};
+let GIORNATA = load(LS.giornata, null);   // dati di giornata (statistiche + probabili + fixtures), da fetch_giornata.py
+let formDemo = null;                       // dataset DEMO (rosa+stat casuali) per provare la Formazione senza toccare la lega vera
 let BOARD = null;
 let selectedId = null;
 // flusso di acquisto nella scheda Asta: idle → chooseOpp → confirm
@@ -426,6 +428,11 @@ async function loadData(forceNetwork = false) {
     ]);
     PLAYERS = pj; META = mj;
     save(LS.players, pj); save(LS.meta, mj);
+    // dati di giornata (opzionali: presenti solo a stagione avviata); non bloccano se assenti
+    try {
+      const gj = await fetch(`data/giornata.json${bust}`, { cache: forceNetwork ? "reload" : "default" }).then((r) => r.ok ? r.json() : null);
+      if (gj) { GIORNATA = gj; save(LS.giornata, gj); }
+    } catch { /* giornata.json non ancora pubblicato: ok */ }
   } catch (e) {
     PLAYERS = load(LS.players, []); META = load(LS.meta, {});
     if (!PLAYERS.length) throw e;
@@ -454,6 +461,7 @@ function renderAll() {
   if (ui.screen === "listone") renderListone();
   if (ui.screen === "squadre") renderSquadre();
   if (ui.screen === "analisi") renderAnalisi();
+  if (ui.screen === "formazione") renderFormazione();
   if (ui.screen === "impostazioni") renderImpostazioni();
 }
 
@@ -1049,6 +1057,153 @@ function setupTeamDnD() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// FORMAZIONE (stagione) — scheda per-giocatore + XI consigliato. Solo FULL/personale.
+// Legge la MIA rosa (PURCHASES della mia squadra) + giornata.json (statistiche +
+// probabili + fixtures). Modalità DEMO: rosa e dati casuali IN MEMORIA (nessun sync,
+// nessuna modifica alla lega vera) per provare grafica e uso.
+// ---------------------------------------------------------------------------
+const MODULI = { "3-4-3": [3,4,3], "3-5-2": [3,5,2], "4-3-3": [4,3,3], "4-4-2": [4,4,2], "4-5-1": [4,5,1], "5-3-2": [5,3,2], "5-4-1": [5,4,1] };
+const _deac = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function giornataActive() { return formDemo ? formDemo.g : GIORNATA; }
+
+// resa attesa: fantamedia (se ci sono partite) o media di ruolo, moderata dalla disponibilità
+function expScore(st, prob, injured) {
+  if (injured) return 0;
+  const base = (st && st.pg > 0 && st.mfv) ? st.mfv : 6.0;
+  let avail;
+  if (!prob) avail = 0.15;                                   // non tra i probabili
+  else if (prob.status === "titolare") avail = (prob.perc ?? 70) / 100;
+  else avail = ((prob.perc ?? 0) / 100) * 0.35;             // riserva: pochi minuti
+  return base * avail;
+}
+function labelFor(prob, injured) {
+  if (injured) return { t: "Panchina", k: "no" };
+  if (!prob) return { t: "Panchina", k: "no" };
+  if (prob.status === "titolare") return (prob.perc ?? 0) >= 75 ? { t: "Schiera", k: "go" } : { t: "Dubbio", k: "maybe" };
+  return (prob.perc ?? 0) >= 55 ? { t: "Dubbio", k: "maybe" } : { t: "Panchina", k: "no" };
+}
+function commentSnippet(nome, squadra, g) {
+  const txt = g && g.commento ? g.commento[squadra] : null;
+  if (!txt) return "";
+  const sur = _deac(nome).split(" ")[0];
+  const frasi = txt.split(/(?<=[.!?])\s+/);
+  const hit = frasi.find((f) => _deac(f).includes(sur));
+  return hit || "";
+}
+// migliore XI sui 7 moduli: per ogni modulo prende i top per resa nei ruoli richiesti
+function bestXI(players) {
+  const byRole = { P: [], D: [], C: [], A: [] };
+  players.forEach((p) => (byRole[p.ruolo] || (byRole[p.ruolo] = [])).push(p));
+  for (const r of ROLES) byRole[r].sort((a, b) => b._exp - a._exp);
+  let best = null;
+  for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
+    if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
+    const xi = [byRole.P[0], ...byRole.D.slice(0, nd), ...byRole.C.slice(0, nc), ...byRole.A.slice(0, na)];
+    const tot = xi.reduce((s, p) => s + p._exp, 0);
+    if (!best || tot > best.tot) best = { mod, tot, xi };
+  }
+  return best;
+}
+
+function renderFormazione() {
+  const el = document.getElementById("formazioneBody");
+  const g = giornataActive();
+  // rosa attiva: demo oppure la mia rosa reale (acquisti della mia squadra)
+  let roster;
+  if (formDemo) roster = formDemo.roster;
+  else roster = PURCHASES.filter((pu) => pu.team === MY_TEAM).map((pu) => {
+    const pl = PLAYERS.find((x) => x.id === pu.playerId) || { id: pu.playerId, nome: pu.nome || pu.playerId, ruolo: pu.ruolo || "C", squadra: pu.squadra || "?" };
+    return { id: pl.id, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
+  });
+
+  const demoBtn = `<button class="btn ghost ${formDemo ? "on" : ""}" data-formdemo="1">${formDemo ? "🧪 Dati demo: ON (esci)" : "🧪 Prova con dati demo"}</button>`;
+  const head = `<div class="fmz-head"><div class="section-title">🧩 Formazione di giornata${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}</div>${demoBtn}</div>`;
+
+  if (!roster.length) {
+    el.innerHTML = head + `<div class="hint" style="margin-top:12px">La tua rosa è vuota (l'asta non è ancora avvenuta). Premi <b>“Prova con dati demo”</b> per vedere come funziona con una rosa e statistiche casuali — non tocca nulla della lega reale.</div>`;
+    return;
+  }
+  if (!g) {
+    el.innerHTML = head + `<div class="hint" style="margin-top:12px">Dati di giornata non ancora disponibili (probabili/statistiche). Compaiono a campionato avviato, oppure attiva i dati demo.</div>`;
+    return;
+  }
+
+  // arricchisci ogni giocatore con stat, probabile, match, resa, etichetta
+  roster.forEach((p) => {
+    p._st = (g.stats || {})[p.id] || null;
+    p._prob = (g.probabili || {})[p.id] || null;
+    p._match = (g.teamMatch || {})[p.squadra] || null;
+    p._exp = expScore(p._st, p._prob, p.infortunato);
+    p._lab = labelFor(p._prob, p.infortunato);
+    p._note = commentSnippet(p.nome, p.squadra, g);
+  });
+
+  // XI consigliato
+  const xi = bestXI(roster);
+  const xiIds = new Set(xi ? xi.xi.map((p) => p.id) : []);
+  let xiHtml = "";
+  if (xi) {
+    const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    xiHtml = `<div class="fmz-xi">
+      <div class="xi-top"><b>XI consigliato</b> · modulo <b>${xi.mod}</b> <span class="meta">(resa attesa ${xi.tot.toFixed(1)})</span></div>
+      ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
+    </div>`;
+  }
+
+  const ord = { go: 0, maybe: 1, no: 2 };
+  const RUOLI_NOME = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
+  const reparti = ROLES.map((r) => {
+    const list = roster.filter((p) => p.ruolo === r).sort((a, b) => ord[a._lab.k] - ord[b._lab.k] || b._exp - a._exp);
+    if (!list.length) return "";
+    return `<div class="fmz-reparto"><div class="rep-title"><span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}</div>${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
+  }).join("");
+
+  el.innerHTML = head + xiHtml + reparti;
+
+  function card(p, inXI) {
+    const st = p._st, pr = p._prob, m = p._match;
+    const perc = pr && pr.perc != null ? pr.perc + "%" : "";
+    const probTxt = p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
+      : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟡"} titolare ${perc}` : `⚪ riserva ${perc} (subentro)`)
+      : "⚪ non tra i probabili";
+    const matchTxt = m ? `vs ${esc(m.opponent)} ${m.home ? "🏠" : "✈️"}` : "";
+    const statTxt = st ? `${st.pg} pres · MV ${(st.mv || 0).toFixed ? st.mv.toFixed(2) : st.mv} · FM ${(st.mfv || 0).toFixed ? st.mfv.toFixed(2) : st.mfv} · ${st.gol}⚽${st.gs ? " · " + st.gs + "🥅sub" : ""}${st.ass ? " · " + st.ass + "🅰" : ""}` : "nessuna statistica";
+    return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}">
+      <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(p.nome)}</span><span class="fc-team">${esc(p.squadra)}${matchTxt ? " · " + matchTxt : ""}</span>${inXI ? `<span class="xi-badge">XI</span>` : ""}</div>
+      <div class="fc-prob">${probTxt}</div>
+      <div class="fc-stat">${statTxt}</div>
+      ${p._note ? `<div class="fc-note">💬 ${esc(p._note)}</div>` : ""}
+    </div>`;
+  }
+}
+
+// genera una rosa + dati di giornata CASUALI, in memoria, per provare la schermata
+function buildFormDemo() {
+  const pick = (arr, n) => { const a = arr.slice(); const out = []; while (out.length < n && a.length) out.push(a.splice(Math.floor(Math.random() * a.length), 1)[0]); return out; };
+  const pool = { P: [], D: [], C: [], A: [] };
+  (PLAYERS.length ? PLAYERS : []).forEach((p) => pool[p.ruolo] && pool[p.ruolo].push(p));
+  const need = { P: 3, D: 8, C: 8, A: 6 };
+  const roster = [];
+  for (const r of ROLES) pick(pool[r], need[r]).forEach((p) => roster.push({ id: p.id, nome: p.nome, ruolo: p.ruolo, squadra: p.squadra, infortunato: Math.random() < 0.08 }));
+  const stats = {}, probabili = {}, teamMatch = {}, commento = {};
+  const avversari = ["Inter", "Milan", "Juventus", "Napoli", "Roma", "Lazio", "Atalanta", "Bologna"];
+  roster.forEach((p) => {
+    const pg = Math.floor(Math.random() * 16);
+    const mv = +(5.5 + Math.random() * 1.6).toFixed(2);
+    const bonus = p.ruolo === "A" ? Math.random() * 1.8 : p.ruolo === "C" ? Math.random() * 1.2 : Math.random() * 0.5;
+    stats[p.id] = { pg, mv, mfv: +(mv + bonus).toFixed(2), gol: p.ruolo === "P" ? 0 : Math.floor(Math.random() * (p.ruolo === "A" ? 9 : 4)), gs: p.ruolo === "P" ? Math.floor(Math.random() * 14) : 0, ass: Math.floor(Math.random() * 5), rigSeg: 0, rigCal: 0, rp: 0, amm: Math.floor(Math.random() * 5), esp: 0 };
+    const roll = Math.random();
+    if (roll < 0.55) probabili[p.id] = { status: "titolare", perc: 75 + Math.floor(Math.random() * 26), conf: "alta", ruolo: p.ruolo };
+    else if (roll < 0.75) probabili[p.id] = { status: "titolare", perc: 50 + Math.floor(Math.random() * 25), conf: "media", ruolo: p.ruolo };
+    else probabili[p.id] = { status: "riserva", perc: 5 + Math.floor(Math.random() * 60), conf: "media", ruolo: p.ruolo };
+    if (!teamMatch[p.squadra]) { const opp = avversari.filter((t) => t !== p.squadra); teamMatch[p.squadra] = { opponent: opp[Math.floor(Math.random() * opp.length)], home: Math.random() < 0.5 }; }
+    commento[p.squadra] = (commento[p.squadra] || "") + `${p.nome} ${["è in buona condizione.", "recupera e s'avvia verso una maglia.", "è in ballottaggio fino all'ultimo.", "parte favorito per una maglia.", "potrebbe rifiatare."][Math.floor(Math.random() * 5)]} `;
+  });
+  return { roster, g: { stats, probabili, teamMatch, commento, demo: true } };
+}
+
 function setScreen(name) {
   ui.screen = name;
   document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.id === `screen-${name}`));
@@ -1127,6 +1282,8 @@ function wire() {
   document.body.addEventListener("click", (e) => {
     if (justDragged) return; // ignora il click sintetico dopo un trascinamento
     if (e.target.closest("#gateBtn")) { submitGate(); return; }
+    const fdemo = e.target.closest("[data-formdemo]");
+    if (fdemo) { formDemo = formDemo ? null : buildFormDemo(); renderFormazione(); return; }
     const sd = e.target.closest("[data-sd]");
     if (sd) { applyStep(sd.dataset.sd, Number(sd.dataset.dd)); return; }
     const remP = e.target.closest("[data-remove-purchase]");

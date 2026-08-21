@@ -40,6 +40,8 @@ jobs:
         run: python pipeline/build_listone_fanta.py
       - name: Ricostruisci players.json
         run: python pipeline/build_players.py
+      - name: Dati di giornata (statistiche + probabili + fixtures)
+        run: python pipeline/fetch_giornata.py || echo "giornata non aggiornata (fonte non disponibile): proseguo"
       - name: Commit e pubblica (robusto ai race)
         run: |
           git config user.name "github-actions[bot]"
