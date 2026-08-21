@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v45"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v46"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1112,6 +1112,8 @@ function bestXI(players) {
 
 function renderFormazione() {
   const el = document.getElementById("formazioneBody");
+  // demo raggiungibile solo via URL ?fdemo=1 (backdoor per rifiniture; nessun pulsante visibile)
+  if (!formDemo && /[?&]fdemo\b/.test(location.search) && PLAYERS.length) formDemo = buildFormDemo();
   const g = giornataActive();
   // rosa attiva: demo oppure la mia rosa reale (acquisti della mia squadra)
   let roster;
@@ -1121,11 +1123,12 @@ function renderFormazione() {
     return { id: pl.id, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
   });
 
-  const demoBtn = `<button class="btn ghost ${formDemo ? "on" : ""}" data-formdemo="1">${formDemo ? "🧪 Dati demo: ON (esci)" : "🧪 Prova con dati demo"}</button>`;
+  // in uso normale nessun pulsante demo; se la demo è attiva (via URL) mostro solo l'uscita
+  const demoBtn = formDemo ? `<button class="btn ghost on" data-formdemo="1">🧪 Esci dalla demo</button>` : "";
   const head = `<div class="fmz-head"><div class="section-title">🧩 Formazione di giornata${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}</div>${demoBtn}</div>`;
 
   if (!roster.length) {
-    el.innerHTML = head + `<div class="hint" style="margin-top:12px">La tua rosa è vuota (l'asta non è ancora avvenuta). Premi <b>“Prova con dati demo”</b> per vedere come funziona con una rosa e statistiche casuali — non tocca nulla della lega reale.</div>`;
+    el.innerHTML = head + `<div class="hint" style="margin-top:12px">La tua rosa è ancora vuota: la <b>Formazione</b> si popola dopo l'asta (con la tua rosa) e a campionato iniziato, con i dati di giornata aggiornati automaticamente.</div>`;
     return;
   }
   if (!g) {
