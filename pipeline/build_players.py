@@ -152,6 +152,15 @@ FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
 FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
 FATTORE_PUNIZIONE = {1: 1.04}
 FATTORE_CORNER = {1: 1.02}
+# opinione esperta goal.com (guida asta a fasce) → riconciliazione con l'FVM.
+# Tocca SOLO le divergenze: declass dove il modello gonfia e goal.com dissente,
+# lieve spinta dove l'app sottovaluta un endorsement. Vedi pipeline/goal_tiers.json.
+GOAL_TIERS = os.path.join(HERE, "goal_tiers.json")
+GOAL_DECLASS = 0.94      # -6%: app alto ma goal.com "scommesse" (o att. 3ª con ≥2 bonus impilati)
+GOAL_BOOST = 1.04        # +4%: goal.com 1ª/2ª ma app Scommessa/Low, o goal Top & app Semi
+GOAL_BOOST_MOD = 1.03    # +3%: difensore "da modificatore" sepolto dall'app (Low)
+GOAL_TOKEN = 1.01        # +1% simbolico: difensore endorsed ma già alto (evita doppio conteggio)
+GOAL_BONUS_EXTRA = 1.02  # extra sub-additivo: difensore spinto su che è ANCHE fonte-bonus
 
 
 def annota_formazioni(players: list[dict]) -> int:
@@ -222,6 +231,82 @@ def annota_rigoristi(players: list[dict]) -> None:
                         tipo_map={"rigore": "rigoreRank", "punizione": "punizioneRank"})
     # corner.json (SOSFanta)
     _annota_specialisti(players, "corner.json", "cornerRank")
+
+
+def _gtok(s: str) -> list[str]:
+    """Token del nome per il match goal.com: deaccentato, senza punteggiatura,
+    scarta le iniziali puntate (es. 'P.' → ignorato)."""
+    return [t for t in re.sub(r"[^A-Z0-9]", " ", _deacc(s)).split() if len(t) > 1]
+
+
+def annota_goal(players: list[dict]) -> int:
+    """Marca ogni giocatore con la fascia goal.com (`goalBand` 1..4) leggendo
+    goal_tiers.json. Match per token del nome DENTRO il ruolo (goal.com non dà la
+    squadra; il ruolo disambigua es. Martinez P vs A). Vince la banda migliore."""
+    if not os.path.exists(GOAL_TIERS):
+        return 0
+    with open(GOAL_TIERS, encoding="utf-8") as f:
+        data = json.load(f)
+    by_role: dict[str, list[dict]] = {}
+    for p in players:
+        by_role.setdefault(p["ruolo"], []).append(p)
+    n = 0
+    for ruolo, bands in data.items():
+        if ruolo.startswith("_"):
+            continue
+        pool = by_role.get(ruolo, [])
+        for band in ("1", "2", "3", "4"):
+            for name in bands.get(band, []):
+                gt = _gtok(name)
+                if not gt:
+                    continue
+                cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
+                if not cands:
+                    continue
+                p = max(cands, key=lambda x: x.get("qi", 0))
+                if "goalBand" not in p:  # la prima (migliore) banda che matcha vince
+                    p["goalBand"] = int(band)
+                    n += 1
+    return n
+
+
+def _app_band(players: list[dict]) -> dict[int, int]:
+    """Fascia quantile per ruolo su valoreBase (replica engine.assignTiers):
+    1=Top(<10%) 2=Semi(<30%) 3=Scommessa(<60%) 4=Low. Chiave = id(p)."""
+    band: dict[int, int] = {}
+    by_role: dict[str, list[dict]] = {}
+    for p in players:
+        by_role.setdefault(p["ruolo"], []).append(p)
+    for pool in by_role.values():
+        arr = sorted(pool, key=lambda x: -x["valoreBase"])
+        n = len(arr)
+        for i, p in enumerate(arr):
+            q = i / n if n else 0
+            band[id(p)] = 1 if q < 0.1 else 2 if q < 0.3 else 3 if q < 0.6 else 4
+    return band
+
+
+def fattore_goal(p: dict, ab: int, gb: int) -> float:
+    """Fattore moltiplicativo goal.com dato (fascia app `ab`, fascia goal `gb`).
+    Agisce solo sulle divergenze; 1.0 = nessun cambiamento (default)."""
+    nb = (1 if p.get("rigoreRank") else 0) + (1 if p.get("punizioneRank") else 0) + (1 if p.get("cornerRank") else 0)
+    f = 1.0
+    # (1) declass: il modello lo tiene alto ma goal.com dissente
+    if ab <= 2 and (gb == 4 or (gb == 3 and nb >= 2 and p["ruolo"] == "A")):
+        f = GOAL_DECLASS
+    # (2) spinta: goal.com endorsa un giocatore che l'app sottovaluta
+    elif gb <= 2 and ab >= 3:
+        f = GOAL_BOOST
+    elif gb == 1 and ab == 2:
+        f = GOAL_BOOST
+    elif p["ruolo"] == "D" and gb == 3 and ab == 4:
+        f = GOAL_BOOST_MOD
+    elif p["ruolo"] == "D" and ab <= 2 and gb <= 3:
+        f = GOAL_TOKEN
+    # (3) difensore VERAMENTE spinto (non token) che è anche fonte-bonus: extra sub-additivo
+    if f > GOAL_TOKEN and p["ruolo"] == "D" and (gb == 2 or nb >= 1):
+        f = round(f * GOAL_BONUS_EXTRA, 3)
+    return round(f, 3)
 
 
 def carica_raw() -> list[dict] | None:
@@ -300,6 +385,25 @@ def main():
         if cb:
             p["valoreBase"] = round(p["valoreBase"] * cb, 2)
 
+    # opinione esperta goal.com: applicata DOPO gli altri fattori (la fascia app è
+    # calcolata sul valoreBase corrente, così confronta l'opinione del modello con
+    # quella di goal.com e la corregge solo dove divergono).
+    if is_reale:
+        n_goal = annota_goal(players)
+        ab_map = _app_band(players)
+        n_goal_mossi = 0
+        for p in players:
+            gb = p.get("goalBand")
+            if not gb:
+                continue
+            gf = fattore_goal(p, ab_map[id(p)], gb)
+            p["goalFactor"] = gf
+            if gf != 1.0:
+                p["valoreBase"] = round(p["valoreBase"] * gf, 2)
+                n_goal_mossi += 1
+    else:
+        n_goal = n_goal_mossi = 0
+
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
         json.dump(players, f, ensure_ascii=False, separators=(",", ":"))
@@ -353,6 +457,8 @@ def main():
         "numRigoristi": sum(1 for p in players if p.get("rigoreRank")),
         "numPunizioni": sum(1 for p in players if p.get("punizioneRank")),
         "numCorner": sum(1 for p in players if p.get("cornerRank")),
+        "numGoalTiers": n_goal,
+        "numGoalMossi": n_goal_mossi,
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",
@@ -363,6 +469,7 @@ def main():
     print(f"Scritti {len(players)} giocatori -> {OUT_PLAYERS}")
     print(f"Per ruolo: {per_ruolo}")
     print(f"QI_SCALE calibrato: {nuova_scala}")
+    print(f"goal.com: {n_goal} match, {n_goal_mossi} valori corretti")
     print(f"Fonte: {fonte}")
     # top 5 per ruolo come sanity check
     for r in ("P", "D", "C", "A"):

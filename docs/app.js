@@ -22,11 +22,14 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v48"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v49"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
 const FORM_SHORT = { titolare: "🟢", ballottaggio: "🟡", riserva: "⚪" };
+// fascia goal.com (guida asta a fasce): 1=top .. 4=scommesse. Il valore è già corretto
+// in pipeline (goalFactor); qui è solo trasparenza sul perché di un prezzo.
+const GOAL_BAND_LABEL = { 1: "1ª fascia", 2: "2ª fascia", 3: "3ª fascia", 4: "scommessa" };
 
 const defaultConfig = () => ({
   numTeams: 10,
@@ -521,7 +524,7 @@ function renderAsta() {
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
         <div class="box"><div class="v">${BOARD.me.maxBid}</div><div class="l">tuo max</div></div>
       </div>
-      <div class="srcinfo">📊 Rating ${p.overall ?? "—"} · Bonus attesi ${p.bonusAtteso ?? "—"} · Titolarità ${Math.round((p.titolarita || 0) * 100)}%${p.formazione ? ` · ${FORM_LABEL[p.formazione]}` : ""}${p.rigoreRank ? ` · ⚽ Rigorista${p.rigoreRank > 1 ? " (" + p.rigoreRank + "ª)" : ""}` : ""}${p.punizioneRank ? ` · 🎯 Punizioni${p.punizioneRank > 1 ? " (" + p.punizioneRank + "ª)" : ""}` : ""}${p.cornerRank ? ` · 🚩 Corner${p.cornerRank > 1 ? " (" + p.cornerRank + "ª)" : ""}` : ""}${adjPct ? ` · <span class="adjv">aggiust. ${adjPct > 0 ? "+" : ""}${adjPct}%</span>` : ""}${pnote ? `<br>📝 ${esc(pnote)}` : ""}</div>
+      <div class="srcinfo">📊 Rating ${p.overall ?? "—"} · Bonus attesi ${p.bonusAtteso ?? "—"} · Titolarità ${Math.round((p.titolarita || 0) * 100)}%${p.formazione ? ` · ${FORM_LABEL[p.formazione]}` : ""}${p.rigoreRank ? ` · ⚽ Rigorista${p.rigoreRank > 1 ? " (" + p.rigoreRank + "ª)" : ""}` : ""}${p.punizioneRank ? ` · 🎯 Punizioni${p.punizioneRank > 1 ? " (" + p.punizioneRank + "ª)" : ""}` : ""}${p.cornerRank ? ` · 🚩 Corner${p.cornerRank > 1 ? " (" + p.cornerRank + "ª)" : ""}` : ""}${p.goalBand ? ` · 🗞️ goal.com ${GOAL_BAND_LABEL[p.goalBand]}${p.goalFactor && p.goalFactor !== 1 ? ` <span class="adjv">${p.goalFactor > 1 ? "+" : ""}${Math.round((p.goalFactor - 1) * 100)}%</span>` : ""}` : ""}${adjPct ? ` · <span class="adjv">aggiust. ${adjPct > 0 ? "+" : ""}${adjPct}%</span>` : ""}${pnote ? `<br>📝 ${esc(pnote)}` : ""}</div>
       <div class="semaforo ${semClass}" id="offerSem"><span class="dot"></span>${semTxt}</div>
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">

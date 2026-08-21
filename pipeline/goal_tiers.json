@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "fonte": "goal.com — Consigli asta Serie A 2026/27 (guida a fasce per ruolo)",
+    "url": "https://www.goal.com/it/liste/consigli-fantacalcio-serie-a-2026-2027-chi-prendere-all-asta-la-guida-completa-divisione-in-fasce-e-ruoli/blt990f9f2a29ab947d",
+    "letto_il": "2026-08-21",
+    "note": "band 1=migliore .. 4=scommesse. Curata a mano dall'articolo; NON scaricata dall'Action. Usata da build_players.py per il fattore di riconciliazione con l'FVM (declass dove il modello gonfia, lieve spinta dove l'app sottovaluta un endorsement).",
+    "bande_per_ruolo": {
+      "P": {"1": "Top", "2": "Consigliati", "4": "Scommesse"},
+      "D": {"1": "Top", "2": "Titolari da bonus", "3": "Titolari da modificatore", "4": "Scommesse"},
+      "C": {"1": "Top", "2": "Titolari da bonus", "3": "Titolari da buon voto", "4": "Scommesse"},
+      "A": {"1": "Top", "2": "Prima fascia", "3": "Seconda/terza fascia", "4": "Scommesse"}
+    }
+  },
+  "P": {
+    "1": ["Butez", "Maignan", "Martinez", "Meret", "Svilar"],
+    "2": ["Carnesecchi", "De Gea", "Falcone", "Mandas", "Okoye", "Vicario"],
+    "4": ["Caprile", "Corvi", "Muric", "Perri", "Skorupski", "Stankovic"]
+  },
+  "D": {
+    "1": ["Bisseck", "Bremer", "Dimarco", "Mancini", "Wesley"],
+    "2": ["Cambiaso", "Di Lorenzo", "Pavlovic", "Ostigard", "Kempf", "Molina", "Scalvini", "Solet", "Spence", "Spinazzola", "Yan Couto"],
+    "3": ["Akanji", "Bastoni", "Chalobah", "Dodo", "Gila", "Haps", "Idzes", "Kalulu", "Kristensen", "Lucumi", "Mina", "Miranda", "Ndicka", "Norton-Cuffy", "Ramon", "Rrahmani", "Tiago Gabriel"],
+    "4": ["Ahanor", "Bellanova", "Bracaglia", "Comuzzo", "Correia", "Doekhi", "Heggem", "Jimenez", "Kaiki", "Mitaj", "Rensch", "Stones"]
+  },
+  "C": {
+    "1": ["Calhanoglu", "McTominay", "Orsolini", "Paz", "Pulisic", "Rabiot"],
+    "2": ["Atta", "Barella", "Baturina", "Bernabe", "Bernardeschi", "Casadei", "Da Cunha", "De Bruyne", "Ederson", "Ekkelenkamp", "Frattesi", "Isaksen", "Mandragora", "Mastantuono", "McKennie", "Mora", "Moreira", "Politano", "Rowe", "Sucic", "Taylor", "Thorstvedt", "Vlasic", "Zaccagni", "Zaniolo", "Zielinski"],
+    "3": ["Baldanzi", "Busio", "Cristante", "Fagioli", "Keita", "Kone", "Lobotka", "Locatelli", "Karlstrom", "Modric", "Nicolussi-Caviglia", "Perrone"],
+    "4": ["Adzic", "Alajbegovic", "Cacciamani", "Calo", "Cambiaghi", "Chakvetadze", "Chukwueze", "Fazzini", "Gaetano", "Gandelman", "Gudmundsson", "Jesus Rodriguez", "Kike Perez", "Koutsoupias", "Lipani", "Milla", "Moro", "Ndour", "Oulai", "Pessina", "Saelemaekers", "Samardzic", "Schmid"]
+  },
+  "A": {
+    "1": ["Lautaro", "Malen", "Thuram"],
+    "2": ["Davis", "Douvikas", "Dovbyk", "Dybala", "Hojlund", "Kean", "Kolo Muani", "Leao", "Ramos", "Scamacca", "Simeone", "Yildiz"],
+    "3": ["Alisson Santos", "Boga", "Castro", "De Ketelaere", "Berardi", "Colombo", "Lauriente", "Nkunku", "Noslin", "Pinamonti", "Raspadori", "Esposito", "Soule"],
+    "4": ["Adams", "Bonny", "Borrelli", "Cutrone", "Diao", "Krstovic", "Maldini", "Pellegrino", "Piccoli", "Stulic", "Toure", "Vitinha", "Yeboah", "Zapata", "Bowie", "Camarda", "Ekhator", "Geubbels", "Kevin Carlos", "Raimondo", "Ratkov"]
+  }
+}
