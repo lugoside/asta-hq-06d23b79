@@ -11,6 +11,8 @@ const LS = {
   moves: "fa_moves", // log di mosse append-only (nuovo modello di sync condiviso)
   resetSeen: "fa_reset_seen", // ultimo resetAt applicato (per il reset di lega)
   unlocked: "fa_unlocked", // gate master password superato su questo dispositivo
+  discreet: "fa_discreet", // modalità discreta (aspetto LITE, consigli nascosti a colpo d'occhio)
+  showtabs: "fa_showtabs", // schede avanzate Analisi/Formazione visibili
 };
 // Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
 // i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
@@ -22,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v51"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v52"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -109,6 +111,25 @@ function load(key, fallback) {
   catch { return fallback; }
 }
 function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+// --- camuffamento: modalità discreta (aspetto LITE) + schede avanzate ----------
+let DISCREET = load(LS.discreet, true);   // default: discreta (sicura sotto asta)
+let SHOWTABS = load(LS.showtabs, false);  // default: Analisi/Formazione nascoste
+function applyDisguise() {
+  document.body.classList.toggle("discreet", DISCREET);
+  document.body.classList.toggle("showtabs", SHOWTABS);
+  const dot = document.getElementById("disguiseToggle");
+  if (dot) { dot.classList.toggle("ext", !DISCREET); dot.textContent = DISCREET ? "" : "●"; }
+  const db = document.getElementById("discreetToggle");
+  if (db) { db.textContent = DISCREET ? "🕶️ Modalità discreta: ATTIVA" : "👁️ Modalità discreta: spenta (vista piena)"; db.classList.toggle("me", !DISCREET); }
+  const tb = document.getElementById("showTabsToggle");
+  if (tb) tb.textContent = SHOWTABS ? "📊 Schede Analisi/Formazione: visibili" : "📊 Schede Analisi/Formazione: nascoste";
+}
+function setDiscreet(v) { DISCREET = v; save(LS.discreet, DISCREET); applyDisguise(); renderAll(); }
+function setShowTabs(v) {
+  SHOWTABS = v; save(LS.showtabs, SHOWTABS); applyDisguise();
+  if (!SHOWTABS && (ui.screen === "analisi" || ui.screen === "formazione")) setScreen("asta");
+}
 // persist(): una modifica di CONFIGURAZIONE/impostazioni (non un acquisto).
 // Salva localmente e programma la pubblicazione della config condivisa sul cloud.
 function persist() {
@@ -519,7 +540,7 @@ function renderAsta() {
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
         <div class="grow">
           <div class="nome">${esc(p.nome)}</div>
-          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]} · valore ${p.valoreBase}</div>
+          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]}<span class="advonly"> · valore ${p.valoreBase}</span></div>
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
@@ -635,9 +656,9 @@ function renderListone() {
     <div class="row ${p.taken ? "taken" : ""}" data-pick="${p.id}">
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
-      <div class="grow"><div class="nome">${p.infortunato ? "🩹 " : ""}${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)} · ${p.tier} · Quot ${p.qa ?? p.qi} · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank ? ` · ⚽${p.rigoreRank}°` : ""}${p.punizioneRank ? ` · 🎯${p.punizioneRank}°` : ""}${p.cornerRank ? ` · 🚩${p.cornerRank}°` : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
-      <span class="price">${p.taken ? p.takenPrice : p.prezzoConsigliato}</span>
+      <div class="grow"><div class="nome">${p.infortunato ? `<span class="advonly">🩹 </span>` : ""}${esc(p.nome)}</div>
+        <div class="meta">${esc(p.squadra)}<span class="advonly"> · ${p.tier}</span> · Quot ${p.qa ?? p.qi}<span class="advonly"> · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank ? ` · ⚽${p.rigoreRank}°` : ""}${p.punizioneRank ? ` · 🎯${p.punizioneRank}°` : ""}${p.cornerRank ? ` · 🚩${p.cornerRank}°` : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}</span>${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+      <span class="price">${p.taken ? p.takenPrice : `<span class="advonly">${p.prezzoConsigliato}</span>`}</span>
     </div>`; }).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
 
@@ -1278,8 +1299,8 @@ function wire() {
     results.innerHTML = found.map((p) => `
       <div class="result-row ${p.taken ? "taken" : ""}" data-pick="${p.id}">
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
-        <div class="grow"><div class="nome">${esc(p.nome)}</div><div class="meta">${esc(p.squadra)} · ${p.tier}</div></div>
-        <span class="price">${p.taken ? "preso" : p.prezzoConsigliato}</span>
+        <div class="grow"><div class="nome">${esc(p.nome)}</div><div class="meta">${esc(p.squadra)}<span class="advonly"> · ${p.tier}</span></div></div>
+        <span class="price">${p.taken ? "preso" : `<span class="advonly">${p.prezzoConsigliato}</span>`}</span>
       </div>`).join("");
   });
 
@@ -1419,6 +1440,10 @@ function wire() {
     renderSync();
   });
   document.getElementById("forceApp").addEventListener("click", forceAppUpdate);
+  document.getElementById("disguiseToggle").addEventListener("click", () => setDiscreet(!DISCREET));
+  document.getElementById("discreetToggle").addEventListener("click", () => setDiscreet(!DISCREET));
+  document.getElementById("showTabsToggle").addEventListener("click", () => setShowTabs(!SHOWTABS));
+  applyDisguise(); // applica subito l'aspetto salvato (evita il flash della vista piena)
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
   document.getElementById("importFile").addEventListener("change", importBackup);

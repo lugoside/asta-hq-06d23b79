@@ -28,8 +28,29 @@ header { position: sticky; top: 0; z-index: 20; background: var(--bg);
   display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 header h1 { font-size: 1.05rem; margin: 0; letter-spacing: .3px; }
 header h1 span { color: var(--accent2); }
+header h1 em { font-style: normal; font-size: .6rem; font-weight: 800; letter-spacing: 1px; color: #0b1220; background: var(--accent2); padding: 2px 6px; border-radius: 6px; vertical-align: middle; margin-left: 2px; display: none; }
+.hdr-right { display: flex; align-items: center; gap: 8px; }
 .data-chip { font-size: .68rem; color: var(--muted); text-align: right; line-height: 1.2; }
 .data-chip.demo { color: var(--giallo); }
+/* pulsantino "vista" (poco visibile): mostra/nasconde i consigli in modalità discreta */
+.disguise { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); opacity: .3; font-size: 9px; line-height: 1; padding: 0; cursor: pointer; flex: none; }
+.disguise.ext { opacity: .55; border-color: var(--accent2); color: var(--accent2); }
+
+/* ===== MODALITÀ DISCRETA: l'app "piena" assume l'aspetto della LITE ===== */
+body.discreet { --accent: #6366f1; --accent2: #818cf8; }
+body.discreet header h1 em { display: inline-block; }
+body.discreet .advonly { display: none !important; }
+body.discreet #calledCard .price-grid,
+body.discreet #calledCard .semaforo,
+body.discreet #calledCard .srcinfo,
+body.discreet #calledCard .adjust,
+body.discreet #calledCard .injury,
+body.discreet #calledCard .tier { display: none !important; }
+/* schede avanzate: nascoste finché non attivate in Setup (indip. dalla modalità) */
+body:not(.showtabs) #tabs [data-screen="analisi"],
+body:not(.showtabs) #tabs [data-screen="formazione"] { display: none; }
+/* la LITE non ha barra budget: nascondila per non far notare la differenza */
+body.discreet #budgetBar { display: none !important; }
 
 /* budget bar (sticky sotto header nella schermata asta) */
 .budget-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;

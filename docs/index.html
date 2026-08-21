@@ -12,8 +12,11 @@
 </head>
 <body>
   <header>
-    <h1>Fanta<span>Asta</span></h1>
-    <div class="data-chip" id="dataChip">…</div>
+    <h1>Fanta<span>Asta</span> <em>LITE</em></h1>
+    <div class="hdr-right">
+      <button id="disguiseToggle" class="disguise" aria-label="vista" title="Vista"></button>
+      <div class="data-chip" id="dataChip">…</div>
+    </div>
   </header>
 
   <!-- barra budget (solo schermata asta) -->
@@ -87,6 +90,14 @@
 
     <!-- ============ IMPOSTAZIONI ============ -->
     <section class="screen" id="screen-impostazioni">
+      <div class="section-title">Vista &amp; riservatezza</div>
+      <div class="setting">
+        <button class="btn full" id="discreetToggle" style="margin-top:0"></button>
+        <div class="hint" style="margin-top:6px">Modalità discreta: l'app assume l'aspetto della versione LITE (stesso colore, stesse schede, nessun prezzo/consiglio visibile a colpo d'occhio). Tocca il <b>puntino</b> in alto a destra per mostrare/nascondere i consigli al volo durante l'asta.</div>
+        <button class="btn ghost full" id="showTabsToggle" style="margin-top:10px"></button>
+        <div class="hint" style="margin-top:6px">Mostra le schede avanzate <b>Analisi</b> e <b>Formazione</b> (nascoste di default per non far notare la differenza).</div>
+      </div>
+
       <div class="section-title">Dati</div>
       <div class="setting">
         <div class="hint" id="metaInfo"></div>
