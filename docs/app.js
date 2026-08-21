@@ -22,7 +22,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v43"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v44"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1146,9 +1146,13 @@ function renderFormazione() {
   let xiHtml = "";
   if (xi) {
     const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    // panchina come gli 11: righe per ruolo, dentro ogni ruolo in ordine di prob. di subentro (resa attesa)
     const bench = roster.filter((p) => !xiIds.has(p.id)).sort((a, b) => b._exp - a._exp);
-    const benchHtml = bench.length ? `<div class="xi-bench"><b>Panchina consigliata</b> <span class="meta">(ordine di subentro)</span>
-      <div class="bench-list">${bench.map((p) => `<span class="bench-item"><span class="rp ${p.ruolo}">${p.ruolo}</span>${esc(p.nome.split(" ")[0])}</span>`).join("")}</div></div>` : "";
+    const benchLine = (r) => bench.filter((p) => p.ruolo === r).map((p) => esc(p.nome.split(" ")[0])).join(", ");
+    const benchHtml = bench.length ? `<div class="xi-bench">
+      <div class="xi-top"><b>Panchina consigliata</b> <span class="meta">(per ruolo · ordine di subentro)</span></div>
+      ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
+    </div>` : "";
     xiHtml = `<div class="fmz-xi">
       <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b> <span class="meta">(resa attesa ${xi.tot.toFixed(1)})</span></div>
       ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
