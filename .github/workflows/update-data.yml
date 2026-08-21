@@ -9,6 +9,9 @@ name: update-data
 # - workflow_dispatch: avviabile A MANO, anche da telefono (GitHub app/web → Run workflow)
 # - schedule: ogni mattina, utile nei giorni prima dell'asta
 on:
+  # push incluso solo per NON generare run-fantasma "failed / No jobs were run":
+  # sul push il job viene saltato (if sotto) → run "skipped", nessuna mail di fallimento.
+  push:
   workflow_dispatch:
   schedule:
     # NB: gli orari cron di GitHub sono in UTC. A ago/set l'Italia è UTC+2 (CEST).
@@ -24,6 +27,8 @@ permissions:
 
 jobs:
   update:
+    # sul push NON facciamo nulla (evita le run fallite "No jobs were run"): gira solo su schedule/manuale
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
