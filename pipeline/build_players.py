@@ -12,6 +12,7 @@ Uso:  python build_players.py            # usa raw se c'è, altrimenti demo
       python build_players.py --demo     # forza il dataset demo
 """
 from __future__ import annotations
+import difflib
 import hashlib
 import json
 import os
@@ -293,8 +294,31 @@ def annota_formazioni_fanta(players: list[dict]) -> dict:
         gt = _gtok(nm)
         if not gt:
             return None
+        # 1) match esatto per sottoinsieme di token
         cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
-        return max(cands, key=lambda x: x.get("qi", 0)) if cands else None
+        if cands:
+            return max(cands, key=lambda x: x.get("qi", 0))
+        # 1b) match COMPATTO (senza spazi): copre le varianti di spaziatura
+        #     ("Delprato" <-> "Del Prato", "Kolo Muani" <-> "Kolomuani").
+        gc = "".join(gt)
+        if len(gc) >= 5:
+            comp = [p for p in pool if gc in "".join(_gtok(p["nome"]))]
+            if comp:
+                return max(comp, key=lambda x: x.get("qi", 0))
+        # 2) fallback FUZZY dentro la stessa squadra: tollera i refusi della fonte
+        #    (es. "Schimd"->Schmid, "Saelemakers"->Saelemaekers). Soglia alta per
+        #    non confondere compagni diversi.
+        main = max(gt, key=len)
+        best_p, best_s = None, 0.0
+        for p in pool:
+            for t in _gtok(p["nome"]):
+                s = difflib.SequenceMatcher(None, main, t).ratio()
+                # stesse lettere in ordine diverso (refuso/trasposizione, es. schimd<->schmid)
+                if len(main) >= 5 and len(t) >= 5 and sorted(main) == sorted(t):
+                    s = max(s, 0.95)
+                if s > best_s:
+                    best_p, best_s = p, s
+        return best_p if best_s >= 0.86 else None
 
     for team, info in data.items():
         pool = by_team.get(_deacc(team), [])
