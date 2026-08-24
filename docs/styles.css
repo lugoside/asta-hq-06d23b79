@@ -69,6 +69,10 @@ main { padding: 12px 14px 20px; max-width: 720px; margin: 0 auto; }
 
 /* search */
 .search-wrap { position: relative; }
+.search-wrap input { padding-right: 40px; }
+.search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: none; align-items: center; justify-content: center; border: none; background: transparent; color: var(--muted); font-size: 1.5rem; line-height: 1; padding: 0; cursor: pointer; border-radius: 50%; z-index: 2; }
+.search-clear.show { display: flex; }
+.search-clear:active { background: var(--card2); }
 input, select { width: 100%; padding: 12px 14px; font-size: 1rem; color: var(--text);
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
 input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }

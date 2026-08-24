@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v53"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v54"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1270,6 +1270,17 @@ function teamName(id) {
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
+// pulsante "×" per svuotare un input di ricerca in un tocco (mostrato solo se c'è testo)
+function wireSearchClear(id) {
+  const inp = document.getElementById(id);
+  const btn = inp && inp.parentElement.querySelector(".search-clear");
+  if (!inp || !btn) return;
+  const upd = () => btn.classList.toggle("show", inp.value.length > 0);
+  inp.addEventListener("input", upd);
+  btn.addEventListener("click", () => { inp.value = ""; inp.dispatchEvent(new Event("input", { bubbles: true })); inp.focus(); });
+  upd();
+}
+
 let toastTimer;
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -1371,6 +1382,7 @@ function wire() {
 
   // filtri listone
   document.getElementById("searchL").addEventListener("input", (e) => { ui.searchL = e.target.value.trim(); renderListone(); });
+  wireSearchClear("search"); wireSearchClear("searchL");
   document.getElementById("roleFilters").addEventListener("click", (e) => {
     const c = e.target.closest("[data-role]"); if (!c) return;
     ui.role = c.dataset.role;
