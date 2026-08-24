@@ -147,6 +147,10 @@ TIT_FORMAZIONE = {"titolare": 0.9, "ballottaggio": 0.6, "riserva": 0.35}
 RANK_STATUS = {"titolare": 3, "ballottaggio": 2, "riserva": 1}
 # quanto lo stato-formazione incide sul valore (e quindi sul prezzo consigliato)
 FATTORE_FORMAZIONE = {"titolare": 1.0, "ballottaggio": 0.9, "riserva": 0.7}
+# corroborazione morbida: SOSFanta dice "ballottaggio" ma fantacalcio.it lo dà titolare
+# → penalità ammorbidita (tra titolare 1.0 e ballottaggio 0.9). Vedi formazioni_fanta.json.
+FATTORE_FORMAZIONE_CORROBORATO = 0.95
+FORMAZIONI_FANTA = os.path.join(HERE, "formazioni_fanta.json")
 # boost per il rigorista designato (rank 1 = titolare dei rigori) e per i battitori di punizione
 # rigore (gol, alta frequenza) > punizione (gol, rara) > corner (assist)
 FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
@@ -270,6 +274,33 @@ def annota_goal(players: list[dict]) -> int:
     return n
 
 
+def annota_formazioni_fanta(players: list[dict]) -> int:
+    """Marca `fantaTitolare=True` i giocatori che l'articolo probabili di
+    fantacalcio.it (formazioni_fanta.json) dà nell'XI-tipo. Match per (squadra, token
+    del nome) DENTRO la squadra. Usato per la corroborazione morbida del ballottaggio."""
+    if not os.path.exists(FORMAZIONI_FANTA):
+        return 0
+    data = json.load(open(FORMAZIONI_FANTA, encoding="utf-8")).get("formazioni", {})
+    by_team: dict[str, list[dict]] = {}
+    for p in players:
+        by_team.setdefault(_deacc(p["squadra"]), []).append(p)
+    n = 0
+    for team, info in data.items():
+        pool = by_team.get(_deacc(team), [])
+        for nm in info.get("titolari", []):
+            gt = _gtok(nm)
+            if not gt:
+                continue
+            cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
+            if not cands:
+                continue
+            p = max(cands, key=lambda x: x.get("qi", 0))
+            if not p.get("fantaTitolare"):
+                p["fantaTitolare"] = True
+                n += 1
+    return n
+
+
 def _app_band(players: list[dict]) -> dict[int, int]:
     """Fascia quantile per ruolo su valoreBase (replica engine.assignTiers):
     1=Top(<10%) 2=Semi(<30%) 3=Scommessa(<60%) 4=Low. Chiave = id(p)."""
@@ -368,13 +399,24 @@ def main():
     # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
     n_infortunati = annota_infortunati(players) if is_reale else 0
     n_formazioni = annota_formazioni(players) if is_reale else 0
+    n_ft = 0
     if is_reale:
         annota_rigoristi(players)  # rigori + punizioni + corner
+        n_ft = annota_formazioni_fanta(players)  # XI-tipo fantacalcio.it (corroborazione)
     # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
     for p in players:
-        f = FATTORE_FORMAZIONE.get(p.get("formazione"))
-        if f and f != 1.0:
-            p["valoreBase"] = round(p["valoreBase"] * f, 2)
+        form = p.get("formazione")
+        ft = p.get("fantaTitolare")
+        if form == "ballottaggio" and ft:
+            # SOSFanta lo dà in ballottaggio ma fantacalcio.it lo dà titolare → penalità morbida
+            p["valoreBase"] = round(p["valoreBase"] * FATTORE_FORMAZIONE_CORROBORATO, 2)
+        else:
+            f = FATTORE_FORMAZIONE.get(form)
+            if f and f != 1.0:
+                p["valoreBase"] = round(p["valoreBase"] * f, 2)
+        # gap-fill: se non avevamo formazione ma fanta.it lo dà titolare → etichetta titolare (prezzo invariato)
+        if not form and ft:
+            p["formazione"] = "titolare"
         rb = FATTORE_RIGORISTA.get(p.get("rigoreRank"))
         if rb:
             p["valoreBase"] = round(p["valoreBase"] * rb, 2)
@@ -459,6 +501,7 @@ def main():
         "numCorner": sum(1 for p in players if p.get("cornerRank")),
         "numGoalTiers": n_goal,
         "numGoalMossi": n_goal_mossi,
+        "numFantaTitolari": n_ft,
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",
@@ -470,6 +513,7 @@ def main():
     print(f"Per ruolo: {per_ruolo}")
     print(f"QI_SCALE calibrato: {nuova_scala}")
     print(f"goal.com: {n_goal} match, {n_goal_mossi} valori corretti")
+    print(f"probabili fantacalcio.it: {n_ft} titolari marcati (corroborazione ballottaggi)")
     print(f"Fonte: {fonte}")
     # top 5 per ruolo come sanity check
     for r in ("P", "D", "C", "A"):

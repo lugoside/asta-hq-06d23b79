@@ -1,7 +1,7 @@
 // Service worker: NETWORK-FIRST con fallback su cache.
 // Online → sempre l'ultima versione (app + dati). Offline → ultima copia salvata.
 // Così ogni aggiornamento del codice arriva subito, mantenendo la resilienza offline.
-const VERSION = "v54";
+const VERSION = "v55";
 const CACHE = "fa-" + VERSION;
 const SHELL_ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js", "./engine.js",
