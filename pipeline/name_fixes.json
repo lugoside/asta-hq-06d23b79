@@ -1,0 +1,8 @@
+{
+  "_meta": {
+    "nota": "Correzioni per falsi match del fuzzy-matcher (build_crosswalk.match). 'drop_old_ids': id del NOSTRO vecchio listone (fantacalcio-online) da NON usare nel match (evita innesti errati di nome/squadra/overall su un giocatore attuale). 'fixes': override nome per fantaId, applicato dopo il merge. Aggiungere qui i casi trovati.",
+    "aggiornato": "2026-08-24"
+  },
+  "drop_old_ids": ["fco6171"],
+  "fixes": {}
+}

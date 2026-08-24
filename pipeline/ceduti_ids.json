@@ -1,8 +1,8 @@
 {
   "_meta": {
     "fonte": "Excel ufficiale fantacalcio.it 2026/27 — foglio Ceduti",
-    "aggiornato": "2026-08-21",
-    "nota": "fantaId da escludere dal listone: la pagina pubblica scrapata li elenca ancora sotto l ex-squadra, l Excel li sposta in Ceduti. Rinfrescare quando si scarica un nuovo Excel."
+    "aggiornato": "2026-08-24",
+    "nota": "fantaId da escludere: la pagina pubblica li elenca ancora sotto la ex-squadra. Rinfrescare a ogni nuovo Excel."
   },
   "ids": [
     "6641",
@@ -21,10 +21,12 @@
     "6245",
     "7164",
     "6984",
+    "7392",
     "5485",
     "2531",
     "6643",
     "383",
+    "7249",
     "7158"
   ],
   "giocatori": [
@@ -44,10 +46,12 @@
     "Vogliacco (Genoa)",
     "Perez M. (Lecce)",
     "Ondrejka (Parma)",
+    "Camara A. (Udinese)",
     "Bjarkason (Venezia)",
     "Lukaku (Napoli)",
     "Dallinga (Bologna)",
     "Petagna (Monza)",
+    "Buksa (Udinese)",
     "Moro L. (Sassuolo)"
   ]
 }

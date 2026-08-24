@@ -1,10 +1,10 @@
 {
-  "aggiornato": "2026-08-24T07:24:08+00:00",
+  "aggiornato": "2026-08-24T07:37:45+00:00",
   "fonteAggiornata": "21/08/2026",
   "sources": {
     "Listone": {
-      "fp": "593f4f499280",
-      "lastChanged": "2026-08-24T07:24:08+00:00"
+      "fp": "14068dd80779",
+      "lastChanged": "2026-08-24T07:37:45+00:00"
     },
     "Infortuni": {
       "fp": "a4b4009fba80",
@@ -25,20 +25,20 @@
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",
   "isDemo": false,
-  "numGiocatori": 518,
+  "numGiocatori": 516,
   "numInfortunati": 27,
-  "numFormazioni": 283,
-  "numRigoristi": 50,
+  "numFormazioni": 284,
+  "numRigoristi": 51,
   "numPunizioni": 56,
   "numCorner": 66,
   "numGoalTiers": 177,
-  "numGoalMossi": 58,
-  "numFantaTitolari": 216,
+  "numGoalMossi": 59,
+  "numFantaTitolari": 217,
   "perRuolo": {
     "P": 63,
     "D": 183,
-    "C": 184,
-    "A": 88
+    "C": 183,
+    "A": 87
   },
   "qiScaleCalibrato": 2.5,
   "stagione": "2026/27"

@@ -106,6 +106,18 @@ def main():
 
     old = json.load(open(args.old, encoding="utf-8"))
 
+    # correzioni fuzzy-matcher (pipeline/name_fixes.json)
+    nf_path = os.path.join(HERE, "name_fixes.json")
+    NAME_FIXES, DROP_OLD = {}, set()
+    if os.path.exists(nf_path):
+        _nf = json.load(open(nf_path, encoding="utf-8"))
+        NAME_FIXES = {str(k): v for k, v in (_nf.get("fixes", {}) or {}).items()}
+        DROP_OLD = set(map(str, _nf.get("drop_old_ids", []) or []))
+    if DROP_OLD:
+        n0 = len(old)
+        old = [o for o in old if str(o.get("id")) not in DROP_OLD]
+        print(f"  ignorati {n0 - len(old)} vecchi record (name_fixes.drop_old_ids) per evitare falsi match")
+
     # match: per ogni giocatore VECCHIO trova la miglior riga fanta (top score);
     # costruisce fantaId -> record vecchio (in caso di collisione tiene lo score piu' alto).
     best = {}  # fantaId -> (score, old_record)
@@ -140,6 +152,16 @@ def main():
                 "stats2526": {}, "note": "", "fantaId": fid,
             })
             n_new += 1
+
+    # override nome per fantaId (name_fixes.fixes), dopo il merge
+    n_fix = 0
+    for p in listone:
+        nn = NAME_FIXES.get(str(p.get("fantaId")))
+        if nn and p.get("nome") != nn:
+            p["nome"] = nn
+            n_fix += 1
+    if n_fix:
+        print(f"  corretti {n_fix} nomi (name_fixes.fixes)")
 
     json.dump(listone, open(args.out, "w", encoding="utf-8"), ensure_ascii=False)
     dropped = len(old) - n_match
