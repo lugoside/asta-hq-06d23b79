@@ -274,31 +274,46 @@ def annota_goal(players: list[dict]) -> int:
     return n
 
 
-def annota_formazioni_fanta(players: list[dict]) -> int:
-    """Marca `fantaTitolare=True` i giocatori che l'articolo probabili di
-    fantacalcio.it (formazioni_fanta.json) dà nell'XI-tipo. Match per (squadra, token
-    del nome) DENTRO la squadra. Usato per la corroborazione morbida del ballottaggio."""
+def annota_formazioni_fanta(players: list[dict]) -> dict:
+    """Da fantacalcio.it (formazioni_fanta.json), stessa fonte delle quotazioni:
+    - `fantaTitolare=True` per l'XI-tipo (corroborazione morbida del ballottaggio);
+    - rigoreRank / punizioneRank dalle liste ordinate → PRIMARIE (override Gazzetta),
+      chiamata DOPO annota_rigoristi così fanta.it vince dove presente e la Gazzetta
+      resta a coprire i buchi. I CORNER restano da SOSFanta (qui non ci sono).
+    Match per (squadra, token del nome) DENTRO la squadra."""
+    res = {"tit": 0, "rig": 0, "pun": 0}
     if not os.path.exists(FORMAZIONI_FANTA):
-        return 0
+        return res
     data = json.load(open(FORMAZIONI_FANTA, encoding="utf-8")).get("formazioni", {})
     by_team: dict[str, list[dict]] = {}
     for p in players:
         by_team.setdefault(_deacc(p["squadra"]), []).append(p)
-    n = 0
+
+    def _find(pool, nm):
+        gt = _gtok(nm)
+        if not gt:
+            return None
+        cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
+        return max(cands, key=lambda x: x.get("qi", 0)) if cands else None
+
     for team, info in data.items():
         pool = by_team.get(_deacc(team), [])
         for nm in info.get("titolari", []):
-            gt = _gtok(nm)
-            if not gt:
-                continue
-            cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
-            if not cands:
-                continue
-            p = max(cands, key=lambda x: x.get("qi", 0))
-            if not p.get("fantaTitolare"):
+            p = _find(pool, nm)
+            if p and not p.get("fantaTitolare"):
                 p["fantaTitolare"] = True
-                n += 1
-    return n
+                res["tit"] += 1
+        for i, nm in enumerate(info.get("rigoristi", [])):
+            p = _find(pool, nm)
+            if p:
+                p["rigoreRank"] = i + 1  # override: fanta.it primaria
+                res["rig"] += 1
+        for i, nm in enumerate(info.get("punizioni", [])):
+            p = _find(pool, nm)
+            if p:
+                p["punizioneRank"] = i + 1
+                res["pun"] += 1
+    return res
 
 
 def _app_band(players: list[dict]) -> dict[int, int]:
@@ -399,10 +414,10 @@ def main():
     # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
     n_infortunati = annota_infortunati(players) if is_reale else 0
     n_formazioni = annota_formazioni(players) if is_reale else 0
-    n_ft = 0
+    n_ft = {"tit": 0, "rig": 0, "pun": 0}
     if is_reale:
-        annota_rigoristi(players)  # rigori + punizioni + corner
-        n_ft = annota_formazioni_fanta(players)  # XI-tipo fantacalcio.it (corroborazione)
+        annota_rigoristi(players)  # rigori + punizioni + corner (Gazzetta/SOSFanta)
+        n_ft = annota_formazioni_fanta(players)  # fanta.it: XI-tipo + rigoristi/punizioni (primari)
     # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
     for p in players:
         form = p.get("formazione")
@@ -501,7 +516,9 @@ def main():
         "numCorner": sum(1 for p in players if p.get("cornerRank")),
         "numGoalTiers": n_goal,
         "numGoalMossi": n_goal_mossi,
-        "numFantaTitolari": n_ft,
+        "numFantaTitolari": n_ft["tit"],
+        "numFantaRigoristi": n_ft["rig"],
+        "numFantaPunizioni": n_ft["pun"],
         "perRuolo": per_ruolo,
         "qiScaleCalibrato": nuova_scala,
         "stagione": "2026/27",
@@ -513,7 +530,7 @@ def main():
     print(f"Per ruolo: {per_ruolo}")
     print(f"QI_SCALE calibrato: {nuova_scala}")
     print(f"goal.com: {n_goal} match, {n_goal_mossi} valori corretti")
-    print(f"probabili fantacalcio.it: {n_ft} titolari marcati (corroborazione ballottaggi)")
+    print(f"probabili fantacalcio.it: {n_ft['tit']} titolari, {n_ft['rig']} rigoristi, {n_ft['pun']} punizioni (primari)")
     print(f"Fonte: {fonte}")
     # top 5 per ruolo come sanity check
     for r in ("P", "D", "C", "A"):

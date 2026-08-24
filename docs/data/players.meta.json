@@ -1,5 +1,5 @@
 {
-  "aggiornato": "2026-08-24T07:37:45+00:00",
+  "aggiornato": "2026-08-24T07:45:51+00:00",
   "fonteAggiornata": "21/08/2026",
   "sources": {
     "Listone": {
@@ -28,12 +28,14 @@
   "numGiocatori": 516,
   "numInfortunati": 27,
   "numFormazioni": 284,
-  "numRigoristi": 51,
-  "numPunizioni": 56,
+  "numRigoristi": 71,
+  "numPunizioni": 66,
   "numCorner": 66,
   "numGoalTiers": 177,
-  "numGoalMossi": 59,
+  "numGoalMossi": 61,
   "numFantaTitolari": 217,
+  "numFantaRigoristi": 59,
+  "numFantaPunizioni": 60,
   "perRuolo": {
     "P": 63,
     "D": 183,
