@@ -141,6 +141,7 @@ def main():
             o["fvm"] = f["fvm"]           # FVM UFFICIALE
             o["ruolo"] = f["ruolo"]       # RUOLO autorevole di lega (fanta.it), non il nostro
             o["ruoloMantra"] = f["mantra"]
+            o["squadra"] = f["sq_raw"]    # SQUADRA ufficiale attuale (fix trasferiti: prima restava quella vecchia)
             o["fantaId"] = fid
             listone.append(o); n_match += 1
         else:
