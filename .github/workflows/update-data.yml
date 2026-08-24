@@ -3,9 +3,11 @@ name: update-data
 # Rigenera docs/data/players.json in AUTOMATICO dalle fonti PUBBLICHE (no login):
 #  1) fetch_quotazioni.py  -> Quotazioni UFFICIALI di fantacalcio.it (id reali, QUOT, FVM)
 #  2) fetch_sources.py     -> listone fantacalcio-online (nomi completi + overall) + fonti extra
+#  2b) fetch_probabili.py  -> probabili formazioni + rigoristi/punizioni (fantacalcio.it, PRIMARI)
 #  3) build_listone_fanta  -> unisce i due in pipeline/listone_base.json (fanta.it autorevole)
 #  4) build_players.py     -> players.json (valore su FVM + enrichment)
-# Tutto scrapabile senza credenziali. (I trasferiti "fuori lista" restano nel listone: scelta voluta.)
+# Tutto scrapabile senza credenziali. NB: i CEDUTI restano l'unico dato manuale (Excel login-gated
+# -> pipeline/ceduti_ids.json). I "fuori lista" ancora quotati vengono esclusi da quella lista.
 # - workflow_dispatch: avviabile A MANO, anche da telefono (GitHub app/web → Run workflow)
 # - schedule: ogni mattina, utile nei giorni prima dell'asta
 on:
@@ -49,6 +51,8 @@ jobs:
         run: python pipeline/fetch_quotazioni.py
       - name: Listone fantacalcio-online (nomi completi + overall) + fonti extra
         run: python pipeline/fetch_sources.py
+      - name: Probabili formazioni + rigoristi/punizioni (fantacalcio.it)
+        run: python pipeline/fetch_probabili.py || echo "probabili non aggiornate: uso l'ultima versione valida, proseguo"
       - name: Rifondi il listone base (unione fanta.it + nomi completi)
         run: python pipeline/build_listone_fanta.py
       - name: Ricostruisci players.json
@@ -60,7 +64,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add docs/data
+            git add docs/data pipeline/formazioni_fanta.json
             if git diff --cached --quiet; then
               echo "Nessuna variazione nei dati."; exit 0
             fi
@@ -72,6 +76,7 @@ jobs:
             git reset --hard HEAD~1
             git fetch origin main
             git reset --hard origin/main
+            python pipeline/fetch_probabili.py || echo "probabili non aggiornate (retry), proseguo"
             python pipeline/build_listone_fanta.py
             python pipeline/build_players.py
           done
