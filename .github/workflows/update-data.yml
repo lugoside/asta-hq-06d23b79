@@ -52,7 +52,7 @@ jobs:
       - name: Listone fantacalcio-online (nomi completi + overall) + fonti extra
         run: python pipeline/fetch_sources.py
       - name: Probabili formazioni + rigoristi/punizioni (fantacalcio.it)
-        run: python pipeline/fetch_probabili.py || echo "probabili non aggiornate: uso l'ultima versione valida, proseguo"
+        run: python pipeline/fetch_probabili.py || echo "probabili non aggiornate, uso l'ultima versione valida e proseguo"
       - name: Rifondi il listone base (unione fanta.it + nomi completi)
         run: python pipeline/build_listone_fanta.py
       - name: Ricostruisci players.json
