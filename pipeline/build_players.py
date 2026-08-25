@@ -114,26 +114,64 @@ def _norm(s: str) -> str:
 
 
 def annota_infortunati(players: list[dict]) -> int:
-    """Marca i giocatori infortunati leggendo raw/infortunati.json (match squadra+nome)."""
-    path = os.path.join(HERE, "raw", "infortunati.json")
-    if not os.path.exists(path):
+    """Marca gli infortunati UNENDO due fonti: raw/infortunati.json (fantacalcio-online,
+    con data di rientro strutturata) + raw/indisponibili.json (fantacalcio.it, copertura
+    più ampia ma spesso senza data). Se un giocatore compare in entrambe, si preferisce la
+    data di rientro non vuota. Match per (squadra, nome), fallback su (squadra, cognome)."""
+    entries = []
+    for fname in ("infortunati.json", "indisponibili.json"):  # ordine: prima la fonte con le date
+        path = os.path.join(HERE, "raw", fname)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                entries += json.load(f)
+    if not entries:
         return 0
-    with open(path, encoding="utf-8") as f:
-        inf = json.load(f)
     by_full = {(_norm(p["squadra"]), _norm(p["nome"])): p for p in players}
-    n = 0
-    for it in inf:
+    marcati = set()
+    for it in entries:
         p = by_full.get((_norm(it["squadra"]), _norm(it["nome"])))
         if not p:  # fallback: stessa squadra + stesso cognome (primo token)
             sur = _norm(it["nome"]).split(" ")[0]
             cand = [pl for pl in players if _norm(pl["squadra"]) == _norm(it["squadra"]) and _norm(pl["nome"]).split(" ")[0] == sur]
             p = cand[0] if len(cand) == 1 else None
-        if p:
-            p["infortunato"] = True
+        if not p:
+            continue
+        p["infortunato"] = True
+        # non sovrascrivere una data già presente con una vuota (unione delle fonti)
+        if it.get("rientro") and not p.get("rientro"):
+            p["rientro"] = it["rientro"]
+        elif "rientro" not in p:
             p["rientro"] = it.get("rientro", "")
-            p["motivoInfortunio"] = it.get("motivo", "")
-            n += 1
-    return n
+        if it.get("motivo") and not p.get("motivoInfortunio"):
+            p["motivoInfortunio"] = it["motivo"]
+        marcati.add(p["id"])
+    return len(marcati)
+
+
+def fattore_infortunio(p: dict, oggi) -> float:
+    """Malus parabolico in base ai giorni al rientro. 1.0 = nessun malus.
+    Rientro passato/oggi → 1.0; data ignota (ma infortunato) → default basso."""
+    if not p.get("infortunato"):
+        return 1.0
+    from datetime import date
+    d = None
+    m = re.search(r"(\d{1,2})/(\d{1,2})(?:/(\d{4}))?", p.get("rientro") or "")
+    if m:
+        gg, mm = int(m.group(1)), int(m.group(2))
+        yy = int(m.group(3)) if m.group(3) else oggi.year
+        try:
+            d = (date(yy, mm, gg) - oggi).days
+            # se la data (senza anno) risulta molto nel passato, è dell'anno prossimo
+            if d < -180 and not m.group(3):
+                d = (date(yy + 1, mm, gg) - oggi).days
+        except ValueError:
+            d = None
+    if d is None:
+        d = INFORTUNIO_GIORNI_DEFAULT
+    if d <= 0:
+        return 1.0
+    frac = min(d, INFORTUNIO_GIORNI_PIENO) / INFORTUNIO_GIORNI_PIENO
+    return round(1.0 - FATTORE_INFORTUNIO_MAX * (frac ** INFORTUNIO_ESP), 3)
 
 
 def _deacc(s: str) -> str:
@@ -157,6 +195,13 @@ FORMAZIONI_FANTA = os.path.join(HERE, "formazioni_fanta.json")
 FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
 FATTORE_PUNIZIONE = {1: 1.04}
 FATTORE_CORNER = {1: 1.02}
+# malus INFORTUNIO proporzionale ai giorni al rientro, PARABOLICO (non lineare):
+# malus = MAX * (min(giorni, PIENO)/PIENO)^2 ; il valore è moltiplicato per (1 - malus).
+# Basso fino a ~1 mese (~2.5%), ripido dopo, 90% a ~6 mesi. Rientro passato → nessun malus.
+FATTORE_INFORTUNIO_MAX = 0.90    # malus massimo (stop >= ~6 mesi)
+INFORTUNIO_GIORNI_PIENO = 180    # giorni di stop a cui si raggiunge il malus massimo
+INFORTUNIO_ESP = 1.75            # esponente della parabola (1=lineare, 2=parabola piena)
+INFORTUNIO_GIORNI_DEFAULT = 30   # infortunato ma SENZA data di rientro nota → malus basso (in attesa esami)
 # opinione esperta goal.com (guida asta a fasce) → riconciliazione con l'FVM.
 # Tocca SOLO le divergenze: declass dove il modello gonfia e goal.com dissente,
 # lieve spinta dove l'app sottovaluta un endorsement. Vedi pipeline/goal_tiers.json.
@@ -443,6 +488,7 @@ def main():
         annota_rigoristi(players)  # rigori + punizioni + corner (Gazzetta/SOSFanta)
         n_ft = annota_formazioni_fanta(players)  # fanta.it: XI-tipo + rigoristi/punizioni (primari)
     # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
+    oggi = datetime.now(timezone.utc).date()
     for p in players:
         form = p.get("formazione")
         ft = p.get("fantaTitolare")
@@ -465,6 +511,11 @@ def main():
         cb = FATTORE_CORNER.get(p.get("cornerRank"))
         if cb:
             p["valoreBase"] = round(p["valoreBase"] * cb, 2)
+        # malus INFORTUNIO (parabolico sui giorni al rientro)
+        inj = fattore_infortunio(p, oggi)
+        p["injuryFactor"] = inj
+        if inj != 1.0:
+            p["valoreBase"] = round(p["valoreBase"] * inj, 2)
 
     # opinione esperta goal.com: applicata DOPO gli altri fattori (la fascia app è
     # calcolata sul valoreBase corrente, così confronta l'opinione del modello con
