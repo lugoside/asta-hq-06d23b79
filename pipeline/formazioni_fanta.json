@@ -32,18 +32,17 @@
       ]
     },
     "Bologna": {
-      "modulo": "4-2-3-1",
+      "modulo": "4-3-3",
       "titolari": [
         "Skorupski",
         "Zortea",
         "Vitik",
         "Heggem",
         "Miranda",
-        "Moro",
         "Ferguson",
+        "Moro",
+        "Odgaard",
         "Orsolini",
-        "Bernardeschi",
-        "Rowe",
         "Dovbyk"
       ],
       "rigoristi": [
@@ -58,7 +57,7 @@
       ]
     },
     "Cagliari": {
-      "modulo": "4-4-2",
+      "modulo": "4-3-2-1",
       "titolari": [
         "Caprile",
         "Ze Pedro",
@@ -68,9 +67,9 @@
         "Adopo",
         "Winks",
         "Romano",
+        "Maldini",
         "Fazzini",
-        "Kevin Carlos",
-        "Maldini"
+        "Kevin Carlos"
       ],
       "rigoristi": [
         "Kevin Carlos",
@@ -140,8 +139,8 @@
       "titolari": [
         "Palmisani",
         "A. Oyono",
-        "Monterisi",
         "Calvani",
+        "Monterisi",
         "Bracaglia",
         "Grillitsch",
         "Calò",
@@ -191,8 +190,8 @@
       "modulo": "3-5-2",
       "titolari": [
         "Martinez",
+        "Bisseck",
         "Akanji",
-        "Stones",
         "Bastoni",
         "Spence",
         "Barella",
@@ -222,9 +221,9 @@
         "Lucumì",
         "Cambiaso",
         "Locatelli",
-        "McKennie",
+        "Thuram",
         "Conceicao",
-        "Alajbegovic",
+        "McKennie",
         "Yildiz",
         "Kolo Muani"
       ],
@@ -244,13 +243,13 @@
       "titolari": [
         "Mandas",
         "Marusic",
-        "Doekhi",
+        "Sutalo",
         "Romagnoli",
         "Pedraza",
-        "Taylor",
-        "Rovella",
         "Frattesi",
-        "Cancellieri",
+        "Rovella",
+        "Taylor",
+        "Isaksen",
         "Dia",
         "Zaccagni"
       ],
@@ -266,7 +265,7 @@
       ]
     },
     "Lecce": {
-      "modulo": "4-2-3-1",
+      "modulo": "4-3-3",
       "titolari": [
         "Falcone",
         "Danilo Veiga",
@@ -298,12 +297,12 @@
         "Gila",
         "Gabbia",
         "Pavlovic",
-        "Saelemakers",
+        "Chukwueze",
         "Modric",
         "Rabiot",
         "Moreira",
         "Pulisic",
-        "Leao",
+        "Cisse",
         "Ramos"
       ],
       "rigoristi": [
@@ -322,15 +321,15 @@
       "titolari": [
         "Thiam",
         "Kouadio",
-        "Delli Carri",
+        "Lucchesi",
         "Carboni",
         "Birindelli",
         "Tourè",
         "Akinsanmiro",
         "Mangas",
         "Colpani",
-        "Mota",
-        "Cutrone"
+        "Cutrone",
+        "Varela"
       ],
       "rigoristi": [
         "Pessina",
@@ -349,7 +348,7 @@
         "Meret",
         "Di Lorenzo",
         "Rrahmani",
-        "Beukema",
+        "Buongiorno",
         "Spinazzola",
         "De Bruyne",
         "Lobotka",
@@ -372,7 +371,7 @@
     "Parma": {
       "modulo": "4-3-3",
       "titolari": [
-        "Daffara",
+        "Corvi",
         "Delprato",
         "Troilo",
         "Valenti",
@@ -477,7 +476,7 @@
       "modulo": "3-4-2-1",
       "titolari": [
         "Okoye",
-        "Bertola",
+        "Palma",
         "Kabasele",
         "Solet",
         "Vojvoda",
@@ -510,7 +509,7 @@
         "Kike Perez",
         "Busio",
         "Basic",
-        "Haps",
+        "Correia",
         "Yeboah",
         "Akor Adams"
       ],

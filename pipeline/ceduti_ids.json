@@ -1,10 +1,11 @@
 {
   "_meta": {
     "fonte": "Excel ufficiale fantacalcio.it 2026/27 — foglio Ceduti",
-    "aggiornato": "2026-08-24",
-    "nota": "fantaId da escludere: la pagina pubblica li elenca ancora sotto la ex-squadra. Rinfrescare a ogni nuovo Excel."
+    "aggiornato": "2026-08-25 (lista a giornata 1 completata)",
+    "nota": "fantaId da escludere: la pagina pubblica li elenca ancora sotto la ex-squadra. Rinfrescare a ogni nuovo Excel (definitivo dopo chiusura mercato 01/09)."
   },
   "ids": [
+    "5876",
     "6641",
     "2297",
     "4929",
@@ -27,9 +28,11 @@
     "6643",
     "383",
     "7249",
+    "7338",
     "7158"
   ],
   "giocatori": [
+    "Di Gregorio (Juventus)",
     "Suzuki (Parma)",
     "Rossi F. (Atalanta)",
     "Ciocci (Cagliari)",
@@ -52,6 +55,7 @@
     "Dallinga (Bologna)",
     "Petagna (Monza)",
     "Buksa (Udinese)",
+    "Albarracin (Cagliari)",
     "Moro L. (Sassuolo)"
   ]
 }
