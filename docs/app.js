@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v62"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v63"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -544,7 +544,7 @@ function renderAsta() {
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
-      ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.injuryFactor && p.injuryFactor < 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
+      ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.injuryFactor && Math.round((1 - p.injuryFactor) * 100) >= 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
       <div class="price-grid">
         <div class="box"><div class="v big">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
