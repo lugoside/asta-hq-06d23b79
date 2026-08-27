@@ -169,7 +169,10 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
 .row .grow { flex: 1; min-width: 0; }
 .row .nome { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .meta { font-size: .74rem; color: var(--muted); }
-.row .price { font-weight: 800; color: var(--accent2); font-size: 1.05rem; }
+.row .price { font-weight: 800; color: var(--accent2); font-size: 1.05rem; min-width: 44px;
+  align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
+/* in discreta la zona prezzo (vuota) resta un bersaglio tappabile per il doppio-tap "espandi" */
+body.discreet #listoneList .row .price { cursor: pointer; }
 .row.taken { opacity: .5; }
 .row.taken .price { color: var(--muted); text-decoration: line-through; }
 .star { background: none; border: none; font-size: 1.1rem; color: var(--muted); padding: 4px; }

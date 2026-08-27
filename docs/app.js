@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v64"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v65"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -87,8 +87,8 @@ let selectedId = null;
 // flusso di acquisto nella scheda Asta: idle → chooseOpp → confirm
 let buyFlow = { mode: "idle", team: null, price: null };
 let justDragged = false; // per non far scattare un tap subito dopo un drag&drop
-// doppio-tap sul nome (modalità discreta): espande/comprime le info del singolo
-let _tapT = 0, _tapEl = null, _tapTimer = null;
+// doppio-tap (modalità discreta): espande/comprime le info del singolo giocatore
+let _tapT = 0, _tapEl = null;
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
@@ -1357,22 +1357,23 @@ function wire() {
     if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
-    // doppio-tap sul nome (solo in modalità discreta): rivela/ricompatta le info del singolo
-    const nameEl = e.target.closest(".nome");
-    if (nameEl && document.body.classList.contains("discreet")) {
-      const inCard = nameEl.closest("#calledCard");
-      const row = nameEl.closest("#listoneList .row[data-pick]");
-      if (inCard || row) {
-        const now = Date.now();
-        const dbl = (now - _tapT < 320) && _tapEl === nameEl;
-        _tapT = now; _tapEl = nameEl;
-        if (inCard) {           // in Asta il nome non naviga: doppio-tap = toggle, singolo = niente
-          if (dbl) { _tapT = 0; document.getElementById("calledCard").classList.toggle("reveal"); }
-          return;
-        }
-        e.stopPropagation();     // LISTONE: singolo = seleziona (ritardato), doppio = reveal
-        if (dbl) { _tapT = 0; clearTimeout(_tapTimer); row.classList.toggle("reveal"); }
-        else { const id = row.dataset.pick; clearTimeout(_tapTimer); _tapTimer = setTimeout(() => selectPlayer(id), 320); }
+    // doppio-tap per espandere le info del singolo (solo in modalità discreta)
+    if (document.body.classList.contains("discreet")) {
+      // ASTA: doppio-tap sul NOME (finestra 400ms; se sbagli non succede nulla di indesiderato)
+      const cardName = e.target.closest("#calledCard .nome");
+      if (cardName) {
+        const now = Date.now(); const dbl = (now - _tapT < 400) && _tapEl === cardName;
+        _tapT = now; _tapEl = cardName;
+        if (dbl) { _tapT = 0; document.getElementById("calledCard").classList.toggle("reveal"); }
+        return;
+      }
+      // LISTONE: zona dedicata a DESTRA (prezzo) → SOLO espandi, mai selezionare per l'asta
+      const priceZone = e.target.closest("#listoneList .row .price");
+      if (priceZone) {
+        e.stopPropagation();
+        const now = Date.now(); const dbl = (now - _tapT < 400) && _tapEl === priceZone;
+        _tapT = now; _tapEl = priceZone;
+        if (dbl) { _tapT = 0; priceZone.closest(".row").classList.toggle("reveal"); }
         return;
       }
     }
