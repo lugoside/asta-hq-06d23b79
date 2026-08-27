@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v65"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v66"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1367,14 +1367,20 @@ function wire() {
         if (dbl) { _tapT = 0; document.getElementById("calledCard").classList.toggle("reveal"); }
         return;
       }
-      // LISTONE: zona dedicata a DESTRA (prezzo) → SOLO espandi, mai selezionare per l'asta
-      const priceZone = e.target.closest("#listoneList .row .price");
-      if (priceZone) {
-        e.stopPropagation();
-        const now = Date.now(); const dbl = (now - _tapT < 400) && _tapEl === priceZone;
-        _tapT = now; _tapEl = priceZone;
-        if (dbl) { _tapT = 0; priceZone.closest(".row").classList.toggle("reveal"); }
-        return;
+      // LISTONE: striscia DESTRA a TUTTA ALTEZZA (geometrica, padding incluso) → SOLO espandi.
+      // Zona misurata sulle coordinate del tap, così non ci sono fasce morte tra una riga e l'altra.
+      const lrow = e.target.closest("#listoneList .row[data-pick]");
+      if (lrow) {
+        const rect = lrow.getBoundingClientRect();
+        const x = e.clientX || (rect.right - 1);
+        if (rect.right - x <= 56) {           // ultimi 56px a destra = zona espandi
+          e.stopPropagation();
+          const now = Date.now(); const dbl = (now - _tapT < 400) && _tapEl === lrow;
+          _tapT = now; _tapEl = lrow;
+          if (dbl) { _tapT = 0; lrow.classList.toggle("reveal"); }
+          return;                              // singolo tap nella zona destra: nessuna selezione
+        }
+        // fuori dalla zona destra → prosegue verso il branch "pick" e seleziona
       }
     }
     const pick = e.target.closest("[data-pick]");
