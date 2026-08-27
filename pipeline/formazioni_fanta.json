@@ -20,6 +20,18 @@
         "Scamacca",
         "Raspadori"
       ],
+      "ballottaggi": [
+        "Bellanova",
+        "Zappacosta",
+        "Kristensen",
+        "Hien",
+        "Samardzic",
+        "Pasalic",
+        "Scamacca",
+        "Krstovic",
+        "Raspadori",
+        "Elmas"
+      ],
       "rigoristi": [
         "Scamacca",
         "Krstovic",
@@ -44,6 +56,18 @@
         "Odgaard",
         "Orsolini",
         "Dovbyk"
+      ],
+      "ballottaggi": [
+        "Moro",
+        "Amondarain",
+        "Odgaard",
+        "Pobega",
+        "Orsolini",
+        "Bernardeschi",
+        "Rowe",
+        "Cambiaghi",
+        "Dovbyk",
+        "Piccoli"
       ],
       "rigoristi": [
         "Orsolini",
@@ -71,6 +95,14 @@
         "Fazzini",
         "Kevin Carlos"
       ],
+      "ballottaggi": [
+        "Rodriguez",
+        "Kofler",
+        "Maldini",
+        "Fadera",
+        "Kevin Carlos",
+        "Mendy"
+      ],
       "rigoristi": [
         "Kevin Carlos",
         "Maldini",
@@ -96,6 +128,17 @@
         "Paz",
         "Baturina",
         "Douvikas"
+      ],
+      "ballottaggi": [
+        "Couto",
+        "Smolcic",
+        "Chalobah",
+        "Kempf",
+        "Kaiki",
+        "Valle",
+        "Diao",
+        "Rodriguez",
+        "Baturina"
       ],
       "rigoristi": [
         "Da Cunha",
@@ -123,6 +166,16 @@
         "Kean",
         "Gudmundsson"
       ],
+      "ballottaggi": [
+        "Jimenez",
+        "Joao Mario",
+        "Viery",
+        "Ranieri",
+        "Oulai",
+        "Fagioli",
+        "Ndour",
+        "Mandragora"
+      ],
       "rigoristi": [
         "Gudmundsson",
         "Kean",
@@ -148,6 +201,18 @@
         "Schimd",
         "Kvernadze",
         "Raimondo"
+      ],
+      "ballottaggi": [
+        "Oyono",
+        "Cittadini",
+        "Calvani",
+        "Akpoguma",
+        "Bracaglia",
+        "Terzic",
+        "Grillitsch",
+        "Cichella",
+        "Ghedjemis",
+        "Zerbin"
       ],
       "rigoristi": [
         "Calò",
@@ -175,6 +240,18 @@
         "Vitinha",
         "Colombo"
       ],
+      "ballottaggi": [
+        "Ellertsson",
+        "Mitaj",
+        "Sow",
+        "Amorim",
+        "Baldanzi",
+        "Traoré",
+        "Vitinha",
+        "Meichtry",
+        "Colombo",
+        "Osmajic"
+      ],
       "rigoristi": [
         "Colombo",
         "Ostigard",
@@ -200,6 +277,16 @@
         "Dimarco",
         "Thuram",
         "Lautaro"
+      ],
+      "ballottaggi": [
+        "Bisseck",
+        "Stones",
+        "Spence",
+        "Diouf",
+        "Jones",
+        "Zielinski",
+        "Thuram",
+        "Pio Esposito"
       ],
       "rigoristi": [
         "Calhanoglu",
@@ -227,6 +314,13 @@
         "Yildiz",
         "Kolo Muani"
       ],
+      "ballottaggi": [
+        "Lucumì",
+        "Kelly",
+        "Cambiaso",
+        "Celik",
+        "Thuram"
+      ],
       "rigoristi": [
         "Kolo Muani",
         "Yildiz",
@@ -252,6 +346,16 @@
         "Isaksen",
         "Dia",
         "Zaccagni"
+      ],
+      "ballottaggi": [
+        "Romagnoli",
+        "Doekhi",
+        "Pedraza",
+        "Tavares",
+        "Isaksen",
+        "Cancellieri",
+        "Dia",
+        "Noslin"
       ],
       "rigoristi": [
         "Zaccagni",
@@ -279,6 +383,18 @@
         "Geubbels",
         "N’Dri"
       ],
+      "ballottaggi": [
+        "Tiago Gabriel",
+        "Siebert",
+        "Ngom",
+        "Gorter",
+        "Berisha",
+        "Gandelman",
+        "N'Dri",
+        "Fatah",
+        "Geubbels",
+        "Stulic"
+      ],
       "rigoristi": [
         "Geubbels",
         "Stulic",
@@ -297,13 +413,20 @@
         "Gila",
         "Gabbia",
         "Pavlovic",
-        "Chukwueze",
+        "Moreira",
         "Modric",
         "Rabiot",
-        "Moreira",
+        "Bartesaghi",
         "Pulisic",
         "Cisse",
         "Ramos"
+      ],
+      "ballottaggi": [
+        "Bartesaghi",
+        "Pulisic",
+        "Loftus-Cheek",
+        "Cisse",
+        "Leao"
       ],
       "rigoristi": [
         "Ramos",
@@ -331,6 +454,13 @@
         "Cutrone",
         "Varela"
       ],
+      "ballottaggi": [
+        "Lucchesi",
+        "Delli Carri Colpani",
+        "Forson",
+        "Cutrone",
+        "Mota"
+      ],
       "rigoristi": [
         "Pessina",
         "Cutrone",
@@ -356,6 +486,18 @@
         "Politano",
         "Hojlund",
         "Alisson Santos"
+      ],
+      "ballottaggi": [
+        "Buongiorno",
+        "Badiashile",
+        "Spinazzola",
+        "Olivera",
+        "De Bruyne",
+        "Anguissa",
+        "De Bruyne",
+        "Vergara",
+        "Politano",
+        "Neres"
       ],
       "rigoristi": [
         "De Bruyne",
@@ -383,6 +525,18 @@
         "Romero",
         "Tourè"
       ],
+      "ballottaggi": [
+        "Corvi",
+        "Daffara",
+        "Valenti",
+        "Ndiaye",
+        "Sorensen",
+        "Ordonez",
+        "Frigan",
+        "Diallo",
+        "Romero",
+        "Elphege"
+      ],
       "rigoristi": [
         "Tourè",
         "Romero",
@@ -408,6 +562,13 @@
         "Dybala",
         "Mora",
         "Malen"
+      ],
+      "ballottaggi": [
+        "Hermoso",
+        "Koulierakis",
+        "Mora",
+        "Pellegrini",
+        "Dybala"
       ],
       "rigoristi": [
         "Malen",
@@ -435,6 +596,18 @@
         "Bowie",
         "Laurientè"
       ],
+      "ballottaggi": [
+        "Leysen",
+        "Candè",
+        "Obrador",
+        "Doig",
+        "Bakola",
+        "Thorstvedt",
+        "Adzic",
+        "Lipani",
+        "Bowie",
+        "Pinamonti"
+      ],
       "rigoristi": [
         "Berardi",
         "Pinamonti",
@@ -460,6 +633,16 @@
         "Casadei",
         "Vlasic",
         "Simeone"
+      ],
+      "ballottaggi": [
+        "Coco",
+        "Ismajli",
+        "Pedersen",
+        "Fortini",
+        "Casadei",
+        "Oristanio",
+        "Casadei",
+        "Njie"
       ],
       "rigoristi": [
         "Vlasic",
@@ -487,6 +670,12 @@
         "Ekkelenkamp",
         "Davis"
       ],
+      "ballottaggi": [
+        "Palma",
+        "Bertola",
+        "Piotrowski",
+        "Miller"
+      ],
       "rigoristi": [
         "Davis",
         "Solet",
@@ -512,6 +701,16 @@
         "Correia",
         "Yeboah",
         "Akor Adams"
+      ],
+      "ballottaggi": [
+        "Halhal",
+        "Moreno",
+        "Correia",
+        "Haps",
+        "Kike Perez",
+        "Sohm",
+        "Adams",
+        "Rrahmani"
       ],
       "rigoristi": [
         "Busio",

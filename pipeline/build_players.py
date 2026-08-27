@@ -148,9 +148,14 @@ def annota_infortunati(players: list[dict]) -> int:
     return len(marcati)
 
 
-def fattore_infortunio(p: dict, oggi) -> float:
-    """Malus parabolico in base ai giorni al rientro. 1.0 = nessun malus.
-    Rientro passato/oggi → 1.0; data ignota (ma infortunato) → default basso."""
+def fattore_infortunio(p: dict, oggi, fvm_peak: float = 0.0) -> float:
+    """Malus infortunio (strategia B, anti doppio-conteggio con l'FVM). 1.0 = nessun malus.
+    - non infortunato / rientro passato → 1.0
+    - infortunio CORTO (rientro entro INFORTUNIO_GIORNI_CORTO) → 1.0 (non vale la pena;
+      l'FVM basta). Anche i casi senza data (default) cadono qui.
+    - infortunio LUNGO → malus parabolico SOLO se l'FVM NON è già sceso per l'infortunio:
+      se il calo dell'FVM dal picco recente (fvm_peak) è >= INFORTUNIO_CALO_FVM il mercato
+      l'ha già prezzato → 1.0; altrimenti applica la parabola (esp INFORTUNIO_ESP)."""
     if not p.get("infortunato"):
         return 1.0
     from datetime import date
@@ -161,17 +166,56 @@ def fattore_infortunio(p: dict, oggi) -> float:
         yy = int(m.group(3)) if m.group(3) else oggi.year
         try:
             d = (date(yy, mm, gg) - oggi).days
-            # se la data (senza anno) risulta molto nel passato, è dell'anno prossimo
             if d < -180 and not m.group(3):
                 d = (date(yy + 1, mm, gg) - oggi).days
         except ValueError:
             d = None
     if d is None:
         d = INFORTUNIO_GIORNI_DEFAULT
-    if d <= 0:
+    if d <= INFORTUNIO_GIORNI_CORTO:      # rientro passato o infortunio corto → nessun malus
+        return 1.0
+    # LUNGO: se l'FVM è già calato dal picco recente, il mercato ha già prezzato lo stop
+    cur = float(p.get("fvm", 0) or 0)
+    if fvm_peak > 0 and cur > 0 and (fvm_peak - cur) / fvm_peak >= INFORTUNIO_CALO_FVM:
         return 1.0
     frac = min(d, INFORTUNIO_GIORNI_PIENO) / INFORTUNIO_GIORNI_PIENO
     return round(1.0 - FATTORE_INFORTUNIO_MAX * (frac ** INFORTUNIO_ESP), 3)
+
+
+FVM_HISTORY = os.path.join(HERE, "fvm_history.json")
+FVM_HISTORY_GIORNI = 21  # finestra dello storico FVM per il picco pre-infortunio
+
+
+def aggiorna_fvm_history(players: list[dict], oggi) -> dict:
+    """Aggiorna pipeline/fvm_history.json con l'FVM di oggi per fantaId, pota oltre
+    FVM_HISTORY_GIORNI giorni, e ritorna {fantaId: picco FVM nella finestra}."""
+    from datetime import date
+    hist = {}
+    if os.path.exists(FVM_HISTORY):
+        try:
+            hist = json.load(open(FVM_HISTORY, encoding="utf-8"))
+        except Exception:
+            hist = {}
+    today = oggi.isoformat()
+    for p in players:
+        fid = str(p.get("fantaId") or "")
+        fv = p.get("fvm")
+        if fid and fv is not None:
+            hist.setdefault(fid, {})[today] = fv
+    # pota le date vecchie
+    def _old(dstr):
+        try:
+            y, mo, dd = map(int, dstr.split("-"))
+            return (oggi - date(y, mo, dd)).days > FVM_HISTORY_GIORNI
+        except Exception:
+            return True
+    for fid in list(hist.keys()):
+        hist[fid] = {dd: v for dd, v in hist[fid].items() if not _old(dd)}
+        if not hist[fid]:
+            del hist[fid]
+    with open(FVM_HISTORY, "w", encoding="utf-8") as f:
+        json.dump(hist, f, ensure_ascii=False)
+    return {fid: max(v.values()) for fid, v in hist.items() if v}
 
 
 def _deacc(s: str) -> str:
@@ -192,16 +236,18 @@ FATTORE_FORMAZIONE_CORROBORATO = 0.95
 FORMAZIONI_FANTA = os.path.join(HERE, "formazioni_fanta.json")
 # boost per il rigorista designato (rank 1 = titolare dei rigori) e per i battitori di punizione
 # rigore (gol, alta frequenza) > punizione (gol, rara) > corner (assist)
-FATTORE_RIGORISTA = {1: 1.10, 2: 1.03}
-FATTORE_PUNIZIONE = {1: 1.04}
-FATTORE_CORNER = {1: 1.02}
+FATTORE_RIGORISTA = {1: 1.10, 2: 1.05, 3: 1.02, 4: 1.01}
+FATTORE_PUNIZIONE = {1: 1.04, 2: 1.02, 3: 1.01}
+FATTORE_CORNER = {1: 1.02, 2: 1.02, 3: 1.01, 4: 1.01, 5: 1.01}
 # malus INFORTUNIO proporzionale ai giorni al rientro, PARABOLICO (non lineare):
 # malus = MAX * (min(giorni, PIENO)/PIENO)^2 ; il valore è moltiplicato per (1 - malus).
 # Basso fino a ~1 mese (~2.5%), ripido dopo, 90% a ~6 mesi. Rientro passato → nessun malus.
 FATTORE_INFORTUNIO_MAX = 0.90    # malus massimo (stop >= ~6 mesi)
 INFORTUNIO_GIORNI_PIENO = 180    # giorni di stop a cui si raggiunge il malus massimo
 INFORTUNIO_ESP = 1.75            # esponente della parabola (1=lineare, 2=parabola piena)
-INFORTUNIO_GIORNI_DEFAULT = 30   # infortunato ma SENZA data di rientro nota → malus basso (in attesa esami)
+INFORTUNIO_GIORNI_DEFAULT = 30   # infortunato ma SENZA data di rientro nota → cade nei "corti" (no malus)
+INFORTUNIO_GIORNI_CORTO = 45     # rientro entro questi giorni = infortunio corto → nessun malus
+INFORTUNIO_CALO_FVM = 0.08       # se l'FVM è già sceso >= 8% dal picco → mercato ha prezzato → no malus
 # opinione esperta goal.com (guida asta a fasce) → riconciliazione con l'FVM.
 # Tocca SOLO le divergenze: declass dove il modello gonfia e goal.com dissente,
 # lieve spinta dove l'app sottovaluta un endorsement. Vedi pipeline/goal_tiers.json.
@@ -287,6 +333,139 @@ def _gtok(s: str) -> list[str]:
     """Token del nome per il match goal.com: deaccentato, senza punteggiatura,
     scarta le iniziali puntate (es. 'P.' → ignorato)."""
     return [t for t in re.sub(r"[^A-Z0-9]", " ", _deacc(s)).split() if len(t) > 1]
+
+
+def _match_in_pool(pool: list[dict], nm: str):
+    """Trova il giocatore in `pool` (stessa squadra) che corrisponde al nome-fonte `nm`,
+    robusto ai refusi: 1) sottoinsieme di token esatto; 2) forma compatta senza spazi
+    ('Del Prato'<->'Delprato'); 3) fuzzy difflib + 'stesse lettere' per le trasposizioni
+    ('Schimd'<->'Schmid'). Ritorna il giocatore o None."""
+    gt = _gtok(nm)
+    if not gt:
+        return None
+    cands = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
+    if cands:
+        return max(cands, key=lambda x: x.get("qi", 0))
+    gc = "".join(gt)
+    if len(gc) >= 5:
+        comp = [p for p in pool if gc in "".join(_gtok(p["nome"]))]
+        if comp:
+            return max(comp, key=lambda x: x.get("qi", 0))
+    main = max(gt, key=len)
+    best_p, best_s = None, 0.0
+    for p in pool:
+        for t in _gtok(p["nome"]):
+            s = difflib.SequenceMatcher(None, main, t).ratio()
+            if len(main) >= 5 and len(t) >= 5 and sorted(main) == sorted(t):
+                s = max(s, 0.95)
+            if s > best_s:
+                best_p, best_s = p, s
+    return best_p if best_s >= 0.86 else None
+
+
+def _candidates(pool: list[dict], nm: str) -> list[dict]:
+    """Tutti i giocatori del pool che matchano il nome-fonte (per la disambiguazione omonimi)."""
+    gt = _gtok(nm)
+    if not gt:
+        return []
+    exact = [p for p in pool if set(gt) <= set(_gtok(p["nome"]))]
+    if exact:
+        return exact
+    gc = "".join(gt)
+    if len(gc) >= 5:
+        comp = [p for p in pool if gc in "".join(_gtok(p["nome"]))]
+        if comp:
+            return comp
+    m = _match_in_pool(pool, nm)
+    return [m] if m else []
+
+
+def _assign(pool: list[dict], names: list[str]) -> dict:
+    """Assegna una LISTA di nomi-fonte ai giocatori, senza doppioni: risolve prima i
+    nomi con meno candidati liberi (match unici), poi gli ambigui ai rimasti.
+    Es. XI Inter 'Lautaro' + 'Martinez' → Lautaro Martinez e Josep Martinez, non due volte Lautaro."""
+    cand = {nm: _candidates(pool, nm) for nm in dict.fromkeys(names)}
+    claimed, res = set(), {}
+    pend = [nm for nm in cand if cand[nm]]
+    while pend:
+        pend.sort(key=lambda nm: len([p for p in cand[nm] if id(p) not in claimed]))
+        nm = pend.pop(0)
+        free = [p for p in cand[nm] if id(p) not in claimed]
+        if not free:
+            continue
+        pl = max(free, key=lambda x: x.get("qi", 0))
+        claimed.add(id(pl))
+        res[nm] = pl
+    return res
+
+
+# CONSENSO formazioni a 3 fonti (SOSFanta + fanta.it + goal.com):
+GOAL_FORMAZIONI = os.path.join(HERE, "goal_formazioni.json")
+FATTORE_CONSENSO_TIT = {3: 1.00, 2: 0.95, 1: 0.90}  # titolare in 3/2/1 fonti
+FATTORE_CONSENSO_BALL = 0.80   # mai titolare, ballottaggio in >=1 fonte
+FATTORE_CONSENSO_RIS = 0.70    # non compare in nessuna lista di nessuna fonte
+
+
+def annota_formazioni_consenso(players: list[dict]) -> dict:
+    """Combina 3 fonti formazioni e assegna a OGNI giocatore un moltiplicatore:
+      - titolare in N fonti → 3:x1.00 / 2:x0.95 / 1:x0.90
+      - mai titolare ma ballottaggio in >=1 fonte → x0.80
+      - assente da tutte → x0.70 (riserva)
+    Fonti: SOSFanta (raw/formazioni.json, status), fanta.it (formazioni_fanta.json,
+    titolari+ballottaggi), goal.com (goal_formazioni.json, titolari+ballottaggi).
+    Setta p['formFactor'], p['formazione'] (label) e p['formVotes'] (trasparenza)."""
+    by_team: dict[str, list[dict]] = {}
+    for p in players:
+        by_team.setdefault(_deacc(p["squadra"]), []).append(p)
+
+    # per ogni fonte: dict team-deacc -> {"tit":[nomi], "ball":[nomi]}
+    def _from_teamdict(path):
+        out = {}
+        if not os.path.exists(path):
+            return out
+        data = json.load(open(path, encoding="utf-8")).get("formazioni", {})
+        for team, info in data.items():
+            out[_deacc(team)] = {"tit": info.get("titolari", []), "ball": info.get("ballottaggi", [])}
+        return out
+
+    src = {}
+    src["fanta"] = _from_teamdict(FORMAZIONI_FANTA)
+    src["goal"] = _from_teamdict(GOAL_FORMAZIONI)
+    # SOSFanta: lista piatta di record {squadra,nome,status}
+    sos = {}
+    spath = os.path.join(HERE, "raw", "formazioni.json")
+    if os.path.exists(spath):
+        for it in json.load(open(spath, encoding="utf-8")):
+            t = _deacc(it["squadra"]); d = sos.setdefault(t, {"tit": [], "ball": []})
+            d["tit" if it.get("status") == "titolare" else "ball"].append(it["nome"])
+    src["sos"] = sos
+
+    for p in players:
+        p["_titSrc"], p["_ballSrc"] = set(), set()
+    for key, bs in src.items():
+        for team, lists in bs.items():
+            pool = by_team.get(team, [])
+            for pl in _assign(pool, lists["tit"]).values():   # assegnazione senza doppioni
+                pl["_titSrc"].add(key)
+            for pl in _assign(pool, lists["ball"]).values():
+                pl["_ballSrc"].add(key)
+
+    cnt = {"tit": 0, "ball": 0, "ris": 0}
+    for p in players:
+        tn, bn = len(p["_titSrc"]), len(p["_ballSrc"])
+        if tn >= 1:
+            p["formFactor"] = FATTORE_CONSENSO_TIT[min(tn, 3)]
+            p["formazione"] = "titolare"; cnt["tit"] += 1
+        elif bn >= 1:
+            p["formFactor"] = FATTORE_CONSENSO_BALL
+            p["formazione"] = "ballottaggio"; cnt["ball"] += 1
+        else:
+            p["formFactor"] = FATTORE_CONSENSO_RIS
+            p["formazione"] = "riserva"; cnt["ris"] += 1
+        p["formVotes"] = {"tit": tn, "ball": bn}
+        p["titolarita"] = TIT_FORMAZIONE.get(p["formazione"], 0.6)
+        del p["_titSrc"], p["_ballSrc"]
+    return cnt
 
 
 def annota_goal(players: list[dict]) -> int:
@@ -480,28 +659,22 @@ def main():
         valuation.QI_SCALE = nuova_scala
         valuta_lista(players)
 
-    # aggancia infortuni e formazioni (solo dati reali) PRIMA di scrivere il file
+    # aggancia infortuni, formazioni (consenso 3 fonti) e rigoristi PRIMA di scrivere
     n_infortunati = annota_infortunati(players) if is_reale else 0
-    n_formazioni = annota_formazioni(players) if is_reale else 0
+    n_cons = {"tit": 0, "ball": 0, "ris": 0}
     n_ft = {"tit": 0, "rig": 0, "pun": 0}
     if is_reale:
         annota_rigoristi(players)  # rigori + punizioni + corner (Gazzetta/SOSFanta)
-        n_ft = annota_formazioni_fanta(players)  # fanta.it: XI-tipo + rigoristi/punizioni (primari)
-    # formazione e rigori incidono sul valore (e quindi sul prezzo consigliato)
+        n_ft = annota_formazioni_fanta(players)  # fanta.it: rigoristi/punizioni (primari) + fantaTitolare
+        n_cons = annota_formazioni_consenso(players)  # 3 fonti → formFactor + formazione (SOVRASCRIVE)
+    n_formazioni = n_cons["tit"] + n_cons["ball"]
+    # formazione (consenso), rigori e infortunio incidono sul valore (→ prezzo consigliato)
     oggi = datetime.now(timezone.utc).date()
+    fvm_peak = aggiorna_fvm_history(players, oggi) if is_reale else {}  # picco FVM per anti doppio-conteggio
     for p in players:
-        form = p.get("formazione")
-        ft = p.get("fantaTitolare")
-        if form == "ballottaggio" and ft:
-            # SOSFanta lo dà in ballottaggio ma fantacalcio.it lo dà titolare → penalità morbida
-            p["valoreBase"] = round(p["valoreBase"] * FATTORE_FORMAZIONE_CORROBORATO, 2)
-        else:
-            f = FATTORE_FORMAZIONE.get(form)
-            if f and f != 1.0:
-                p["valoreBase"] = round(p["valoreBase"] * f, 2)
-        # gap-fill: se non avevamo formazione ma fanta.it lo dà titolare → etichetta titolare (prezzo invariato)
-        if not form and ft:
-            p["formazione"] = "titolare"
+        ff = p.get("formFactor", 1.0)  # consenso: 1.00/0.95/0.90 tit · 0.80 ball · 0.70 ris
+        if ff != 1.0:
+            p["valoreBase"] = round(p["valoreBase"] * ff, 2)
         rb = FATTORE_RIGORISTA.get(p.get("rigoreRank"))
         if rb:
             p["valoreBase"] = round(p["valoreBase"] * rb, 2)
@@ -511,8 +684,8 @@ def main():
         cb = FATTORE_CORNER.get(p.get("cornerRank"))
         if cb:
             p["valoreBase"] = round(p["valoreBase"] * cb, 2)
-        # malus INFORTUNIO (parabolico sui giorni al rientro)
-        inj = fattore_infortunio(p, oggi)
+        # malus INFORTUNIO (strategia B: corti=0, lunghi solo se FVM non già sceso)
+        inj = fattore_infortunio(p, oggi, fvm_peak.get(str(p.get("fantaId")), 0.0))
         p["injuryFactor"] = inj
         if inj != 1.0:
             p["valoreBase"] = round(p["valoreBase"] * inj, 2)
@@ -586,6 +759,7 @@ def main():
         "numGiocatori": len(players),
         "numInfortunati": n_infortunati,
         "numFormazioni": n_formazioni,
+        "consensoFormazioni": n_cons,
         "numRigoristi": sum(1 for p in players if p.get("rigoreRank")),
         "numPunizioni": sum(1 for p in players if p.get("punizioneRank")),
         "numCorner": sum(1 for p in players if p.get("cornerRank")),
@@ -605,7 +779,8 @@ def main():
     print(f"Per ruolo: {per_ruolo}")
     print(f"QI_SCALE calibrato: {nuova_scala}")
     print(f"goal.com: {n_goal} match, {n_goal_mossi} valori corretti")
-    print(f"probabili fantacalcio.it: {n_ft['tit']} titolari, {n_ft['rig']} rigoristi, {n_ft['pun']} punizioni (primari)")
+    print(f"probabili fantacalcio.it: {n_ft['rig']} rigoristi, {n_ft['pun']} punizioni (primari)")
+    print(f"consenso formazioni (3 fonti): titolari {n_cons['tit']}, ballottaggi {n_cons['ball']}, riserve {n_cons['ris']}")
     print(f"Fonte: {fonte}")
     # top 5 per ruolo come sanity check
     for r in ("P", "D", "C", "A"):

@@ -55,6 +55,8 @@ jobs:
         run: python pipeline/fetch_probabili.py || echo "probabili non aggiornate, uso l'ultima versione valida e proseguo"
       - name: Indisponibili/infortunati (fantacalcio.it, 2a fonte)
         run: python pipeline/fetch_indisponibili.py || echo "indisponibili non aggiornati, proseguo"
+      - name: Formazioni goal.com (3a fonte per il consenso)
+        run: python pipeline/fetch_goal_formazioni.py || echo "goal.com non aggiornato, uso l'ultima versione valida e proseguo"
       - name: Rifondi il listone base (unione fanta.it + nomi completi)
         run: python pipeline/build_listone_fanta.py
       - name: Ricostruisci players.json
@@ -66,7 +68,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add docs/data pipeline/formazioni_fanta.json
+            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json
             if git diff --cached --quiet; then
               echo "Nessuna variazione nei dati."; exit 0
             fi
@@ -79,6 +81,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             python pipeline/fetch_probabili.py || echo "probabili non aggiornate (retry), proseguo"
+            python pipeline/fetch_goal_formazioni.py || echo "goal.com non aggiornato (retry), proseguo"
             python pipeline/build_listone_fanta.py
             python pipeline/build_players.py
           done

@@ -80,13 +80,21 @@ def parse(html: str) -> dict:
         modulo = mm.group(1) if mm else ""
         fm = re.search(r"Probabile formazione[^:]*:\s*(.*?)(?:Ballottagg|Rigoristi|Calci da fermo)", block)
         titolari = _names(fm.group(1)) if fm else []
+        # ballottaggi: "X/Y; W/Z; ..." (separatori ; , /) fino a Rigoristi
+        bm = re.search(r"Ballottagg[^:]*:\s*(.*?)(?:Rigoristi|Calci da fermo|$)", block)
+        ball = []
+        if bm:
+            for tok in re.split(r"[;,/]", bm.group(1)):
+                n = tok.strip(" .")
+                if n and "(" not in n and re.match(r"^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\- ]{1,}$", n):
+                    ball.append(n)
         rm = re.search(r"Rigoristi\s*:\s*(.*?)(?:Calci da fermo|Ballottagg|$)", block)
         rig = _names(rm.group(1)) if rm else []
         pm = re.search(r"Calci da fermo\s*:\s*(.*)$", block)
         pun = _names(pm.group(1)) if pm else []
         # nome squadra come nei nostri dati (Titlecase)
         key = team.capitalize()
-        res[key] = {"modulo": modulo, "titolari": titolari[:11],
+        res[key] = {"modulo": modulo, "titolari": titolari[:11], "ballottaggi": ball[:20],
                     "rigoristi": rig[:4], "punizioni": pun[:4]}
     return res
 

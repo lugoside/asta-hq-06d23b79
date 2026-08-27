@@ -309,22 +309,14 @@ def main():
     with open(os.path.join(RAW_DIR, "infortunati.json"), "w", encoding="utf-8") as f:
         json.dump(inf, f, ensure_ascii=False)
 
-    # probabili formazioni (DAZN)
-    # Formazioni: SOSFanta è la PRIMARIA (formato testo stabile, tutte le squadre).
-    # DAZN resta come fallback (contenuto corretto ma HTML variabile → parsing inaffidabile).
+    # probabili formazioni: SOLO SOSFanta (formato testo stabile, tutte le squadre).
+    # DAZN rimosso: metteva tra parentesi indistintamente riserve E ballottaggi (fuorviante)
+    # e il suo HTML è inaffidabile. Il CONSENSO usa SOSFanta + fanta.it + goal.com.
     try:
         form = parse_formazioni_sos(fetch_html(FORMAZIONI_SOS_URL), SQUADRE_SERIEA)
     except Exception as e:
         form = []
         print("Attenzione: formazioni SOS non lette:", e)
-    if len({x["squadra"] for x in form}) < 15:
-        try:
-            dazn = parse_formazioni(fetch_html(FORMAZIONI_URL))
-            if len({x["squadra"] for x in dazn}) > len({x["squadra"] for x in form}):
-                form = dazn
-                print("Uso il fallback DAZN per le formazioni")
-        except Exception as e:
-            print("Attenzione: fallback DAZN non letto:", e)
     with open(os.path.join(RAW_DIR, "formazioni.json"), "w", encoding="utf-8") as f:
         json.dump(form, f, ensure_ascii=False)
 

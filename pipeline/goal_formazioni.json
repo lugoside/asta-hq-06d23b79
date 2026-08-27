@@ -1,0 +1,419 @@
+{
+  "_meta": {
+    "fonte": "goal.com — formazioni-tipo Serie A 2026/27",
+    "url": "https://www.goal.com/it/liste/fantacalcio-formazioni-titolari-serie-a-2026-2027-tutte-le-squadre-tipo/blt5527c89487e5b7d3",
+    "nota": "titolari = FORMAZIONE TIPO; ballottaggi = 'Altri possibili titolari'. Una delle 3 fonti del consenso formazioni."
+  },
+  "formazioni": {
+    "Atalanta": {
+      "titolari": [
+        "Carnesecchi",
+        "Zappacosta",
+        "Scalvini",
+        "Kristensen",
+        "Ahanor",
+        "Samardzic",
+        "Gaetano",
+        "Ederson",
+        "De Ketelaere",
+        "Scamacca",
+        "Raspadori"
+      ],
+      "ballottaggi": [
+        "Hien",
+        "De Roon",
+        "Pasalic",
+        "Krstovic"
+      ]
+    },
+    "Bologna": {
+      "titolari": [
+        "Skorupski",
+        "Zortea",
+        "Vitik",
+        "Heggem",
+        "Miranda",
+        "Ferguson",
+        "El Azzouzi",
+        "Bernardeschi",
+        "Orsolini",
+        "Dovbyk",
+        "Rowe"
+      ],
+      "ballottaggi": [
+        "Holm",
+        "Pobega",
+        "Odgaard",
+        "Piccoli"
+      ]
+    },
+    "Cagliari": {
+      "titolari": [
+        "Caprile",
+        "Ze Pedro",
+        "Mina",
+        "Rodriguez",
+        "Obert",
+        "Adopo",
+        "Winks",
+        "Romano",
+        "Maldini",
+        "Kevin Carlos",
+        "Fazzini"
+      ],
+      "ballottaggi": [
+        "Deiola",
+        "Felici"
+      ]
+    },
+    "Como": {
+      "titolari": [
+        "Butez",
+        "Yan Couto",
+        "Chalobah",
+        "Ramon",
+        "Kaiki",
+        "Da Cunha",
+        "Perrone",
+        "Diao",
+        "Nico Paz",
+        "Baturina",
+        "Douvikas"
+      ],
+      "ballottaggi": [
+        "Valle",
+        "Kempf",
+        "Milla"
+      ]
+    },
+    "Fiorentina": {
+      "titolari": [
+        "De Gea",
+        "Dodo",
+        "Dragusin",
+        "Viery",
+        "Jimenez",
+        "Oulai",
+        "Fagioli",
+        "Ndour",
+        "Atta",
+        "Kean",
+        "Mastantuono"
+      ],
+      "ballottaggi": [
+        "Pongracic",
+        "Valdepenas",
+        "Gudmundsson"
+      ]
+    },
+    "Frosinone": {
+      "titolari": [
+        "Palmisani",
+        "Oyono",
+        "Akpoguma",
+        "Monterisi",
+        "Bracaglia",
+        "Grillitsch",
+        "Calò",
+        "Ghedjemis",
+        "Schmid",
+        "Kvernadze",
+        "Raimondo"
+      ],
+      "ballottaggi": [
+        "Calvani",
+        "Terzic",
+        "Masini",
+        "Fini",
+        "Zerbin"
+      ]
+    },
+    "Genoa": {
+      "titolari": [
+        "Bijlow",
+        "Marcandalli",
+        "Ostigard",
+        "Vasquez",
+        "Norton-Cuffy",
+        "Frendrup",
+        "Sow",
+        "Mitaj",
+        "Baldanzi",
+        "Vitinha",
+        "Colombo"
+      ],
+      "ballottaggi": [
+        "Ellertsson",
+        "Traore",
+        "Ethan-Meichtry"
+      ]
+    },
+    "Inter": {
+      "titolari": [
+        "Martinez",
+        "Bisseck",
+        "Akanji",
+        "Bastoni",
+        "Spence",
+        "Barella",
+        "Calhanoglu",
+        "Sucic",
+        "Dimarco",
+        "Lautaro",
+        "Thuram"
+      ],
+      "ballottaggi": [
+        "Stones",
+        "Diouf",
+        "Zielinski"
+      ]
+    },
+    "Juventus": {
+      "titolari": [
+        "Vicario",
+        "Kalulu",
+        "Bremer",
+        "Lucumì",
+        "Cambiaso",
+        "Locatelli",
+        "Thuram",
+        "Conceiçao",
+        "McKennie",
+        "Yildiz",
+        "Kolo Muani"
+      ],
+      "ballottaggi": [
+        "Celik",
+        "Douglas Luiz",
+        "Alajbegovic"
+      ]
+    },
+    "Lazio": {
+      "titolari": [
+        "Mandas",
+        "Marusic",
+        "Doekhi",
+        "Sutalo",
+        "Pedraza",
+        "Taylor",
+        "Rovella",
+        "Frattesi",
+        "Isaksen",
+        "Pinamonti",
+        "Zaccagni"
+      ],
+      "ballottaggi": [
+        "Provstgaard",
+        "Nuno Tavares",
+        "Cataldi",
+        "Dia"
+      ]
+    },
+    "Lecce": {
+      "titolari": [
+        "Falcone",
+        "D. Veiga",
+        "Gaspar",
+        "Tiago Gabriel",
+        "Gallo",
+        "Ilic",
+        "Coulibaly",
+        "Pierotti",
+        "Gandelman",
+        "N'dri",
+        "Geubbels"
+      ],
+      "ballottaggi": [
+        "Siebert",
+        "Berisha",
+        "Stulic"
+      ]
+    },
+    "Milan": {
+      "titolari": [
+        "Maignan",
+        "Gila",
+        "Gabbia",
+        "Pavlovic",
+        "Chukwueze",
+        "Modric",
+        "Rabiot",
+        "Bartesaghi",
+        "Pulisic",
+        "Diego Moreira",
+        "Ramos"
+      ],
+      "ballottaggi": [
+        "Jashari",
+        "Leao",
+        "Saelemaekers"
+      ]
+    },
+    "Monza": {
+      "titolari": [
+        "Thiam",
+        "Birindelli",
+        "Lucchesi",
+        "Carboni",
+        "Touré",
+        "Pessina",
+        "Akinsanmiro",
+        "Mangas",
+        "Colpani",
+        "Cutrone",
+        "Varela"
+      ],
+      "ballottaggi": [
+        "Kouadio",
+        "Mout",
+        "Foet Ondoa",
+        "Colombo",
+        "Ciurria"
+      ]
+    },
+    "Napoli": {
+      "titolari": [
+        "Meret",
+        "Di Lorenzo",
+        "Rrahmani",
+        "Badiashile",
+        "Spinazzola",
+        "De Bruyne",
+        "Lobotka",
+        "McTominay",
+        "Politano",
+        "Hojlund",
+        "Alisson"
+      ],
+      "ballottaggi": [
+        "Beukema",
+        "Olivera",
+        "Anguissa",
+        "Neres"
+      ]
+    },
+    "Parma": {
+      "titolari": [
+        "Corvi",
+        "Delprato",
+        "Troilo",
+        "Valenti",
+        "Valeri",
+        "Ordonez",
+        "Keita",
+        "Nicolussi-Caviglia",
+        "Bernabé",
+        "Lontani",
+        "Touré"
+      ],
+      "ballottaggi": [
+        "Sorensen",
+        "Diallo",
+        "Romero",
+        "Elphege"
+      ]
+    },
+    "Roma": {
+      "titolari": [
+        "Svilar",
+        "Hermoso",
+        "Mancini",
+        "Ndicka",
+        "Molina",
+        "Cristante",
+        "Kone",
+        "Wesley",
+        "Mora",
+        "Dybala",
+        "Malen"
+      ],
+      "ballottaggi": [
+        "Koulierakis",
+        "Pellegrini",
+        "Soulé",
+        "Castro"
+      ]
+    },
+    "Sassuolo": {
+      "titolari": [
+        "Muric",
+        "Missori",
+        "Walukiewicz",
+        "Idzes",
+        "Obrador",
+        "Thorstvedt",
+        "Matic",
+        "Adzic",
+        "Berardi",
+        "Bowie",
+        "Lauriente"
+      ],
+      "ballottaggi": [
+        "Doig",
+        "Bakola",
+        "Volpato"
+      ]
+    },
+    "Torino": {
+      "titolari": [
+        "Mascardi",
+        "Ismajli",
+        "Coco",
+        "Comuzzo",
+        "Pedersen",
+        "Gineitis",
+        "Fitz-Jim",
+        "Cacciamani",
+        "Vlasic",
+        "Casasei",
+        "Simeone"
+      ],
+      "ballottaggi": [
+        "Comert",
+        "Fortini",
+        "Oristanio",
+        "Adams"
+      ]
+    },
+    "Udinese": {
+      "titolari": [
+        "Okoye",
+        "Bertola",
+        "Kabasele",
+        "Solet",
+        "Vojvoda",
+        "Ekkelenkamp",
+        "Karlstrom",
+        "Piotrowski",
+        "Kamara",
+        "Zaniolo",
+        "Davis"
+      ],
+      "ballottaggi": [
+        "Zanoli",
+        "Unai Gomez",
+        "Miller"
+      ]
+    },
+    "Venezia": {
+      "titolari": [
+        "Stankovic",
+        "Bella-Kotchap",
+        "Schingtienne",
+        "Moreno",
+        "Hainaut",
+        "Basic",
+        "Busio",
+        "Sohm",
+        "Correia",
+        "Adams",
+        "Yeboah"
+      ],
+      "ballottaggi": [
+        "Haps",
+        "Kike Perez",
+        "Rrahmani"
+      ]
+    }
+  }
+}
