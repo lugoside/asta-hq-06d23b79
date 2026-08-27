@@ -173,6 +173,10 @@ input:focus, select:focus { outline: 2px solid var(--accent); border-color: var(
   align-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
 /* in discreta la zona prezzo (vuota) resta un bersaglio tappabile per il doppio-tap "espandi" */
 body.discreet #listoneList .row .price { cursor: pointer; }
+/* delimitatore verticale APPENA percettibile al confine della zona doppio-tap (solo discreta) */
+body.discreet #listoneList .row { position: relative; }
+body.discreet #listoneList .row::after { content: ""; position: absolute; top: 22%; bottom: 22%;
+  right: 56px; width: 1px; background: var(--muted); opacity: .22; pointer-events: none; }
 .row.taken { opacity: .5; }
 .row.taken .price { color: var(--muted); text-decoration: line-through; }
 .star { background: none; border: none; font-size: 1.1rem; color: var(--muted); padding: 4px; }
