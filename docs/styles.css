@@ -176,7 +176,7 @@ body.discreet #listoneList .row .price { cursor: pointer; }
 /* delimitatore verticale APPENA percettibile al confine della zona doppio-tap (solo discreta) */
 body.discreet #listoneList .row { position: relative; }
 body.discreet #listoneList .row::after { content: ""; position: absolute; top: 22%; bottom: 22%;
-  right: 56px; width: 1px; background: var(--muted); opacity: .22; pointer-events: none; }
+  right: 56px; width: 1px; background: #1c2a45; pointer-events: none; }
 .row.taken { opacity: .5; }
 .row.taken .price { color: var(--muted); text-decoration: line-through; }
 .star { background: none; border: none; font-size: 1.1rem; color: var(--muted); padding: 4px; }
