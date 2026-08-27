@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v63"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v64"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -87,6 +87,8 @@ let selectedId = null;
 // flusso di acquisto nella scheda Asta: idle → chooseOpp → confirm
 let buyFlow = { mode: "idle", team: null, price: null };
 let justDragged = false; // per non far scattare un tap subito dopo un drag&drop
+// doppio-tap sul nome (modalità discreta): espande/comprime le info del singolo
+let _tapT = 0, _tapEl = null, _tapTimer = null;
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
@@ -525,9 +527,9 @@ function renderAsta() {
   } else {
     card.className = "called";
     const offer = buyFlow.price != null ? buyFlow.price : 1;
-    let semClass, semTxt;
-    if (p.taken) { semClass = "giallo"; semTxt = `✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}`; }
-    else { const v = offerVerdict(p, offer); semClass = v.cls; semTxt = v.txt; }
+    // colore del "consigliato" in base all'offerta (ex-semaforo): indaco / giallo / rosso
+    const vCls = p.taken ? "verde" : offerVerdict(p, offer).cls;
+    const consCls = vCls === "giallo" ? " warn" : vCls === "rosso" ? " danger" : "";
     const adjPct = (CONFIG.adjust && CONFIG.adjust[p.id]) || 0;
     const pnote = (CONFIG.notes && CONFIG.notes[p.id]) || "";
     // "tuo max reparto": crediti ancora previsti dal tuo piano di ripartizione per il ruolo
@@ -546,13 +548,13 @@ function renderAsta() {
       </div>
       ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.injuryFactor && Math.round((1 - p.injuryFactor) * 100) >= 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
       <div class="price-grid">
-        <div class="box"><div class="v big">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
+        <div class="box"><div class="v big${consCls}" id="consVal">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
         <div class="box"><div class="v">${BOARD.me.maxBid}</div><div class="l">tuo max</div></div>
         <div class="box" title="Crediti ancora previsti dal tuo piano di ripartizione per questo reparto (${_roleBudget} pianificati − ${_roleSpent} spesi)"><div class="v${roleLeft <= 0 ? " over" : ""}">${roleLeft}</div><div class="l">tuo max reparto</div></div>
       </div>
       <div class="srcinfo">📊 Rating ${p.overall ?? "—"} · Bonus attesi ${p.bonusAtteso ?? "—"} · Titolarità ${Math.round((p.titolarita || 0) * 100)}%${p.formazione ? ` · ${FORM_LABEL[p.formazione]}` : ""}${p.rigoreRank ? ` · ⚽ Rigorista${p.rigoreRank > 1 ? " (" + p.rigoreRank + "ª)" : ""}` : ""}${p.punizioneRank ? ` · 🎯 Punizioni${p.punizioneRank > 1 ? " (" + p.punizioneRank + "ª)" : ""}` : ""}${p.cornerRank ? ` · 🚩 Corner${p.cornerRank > 1 ? " (" + p.cornerRank + "ª)" : ""}` : ""}${p.goalBand ? ` · 🗞️ goal.com ${GOAL_BAND_LABEL[p.goalBand]}${p.goalFactor && p.goalFactor !== 1 ? ` <span class="adjv">${p.goalFactor > 1 ? "+" : ""}${Math.round((p.goalFactor - 1) * 100)}%</span>` : ""}` : ""}${adjPct ? ` · <span class="adjv">aggiust. ${adjPct > 0 ? "+" : ""}${adjPct}%</span>` : ""}${pnote ? `<br>📝 ${esc(pnote)}` : ""}</div>
-      <div class="semaforo ${semClass}" id="offerSem"><span class="dot"></span>${semTxt}</div>
+      ${p.taken ? `<div style="font-size:.85rem;color:var(--muted);margin:10px 0">✔ Preso da ${teamName(p.takenBy)} a ${p.takenPrice}</div>` : ""}
       ${p.taken ? `<button class="btn ghost full" data-undo="${p.id}">↩ Annulla acquisto</button>` : `
       <div class="buy-row">
         <button class="step" data-step="-1">−</button>
@@ -579,15 +581,16 @@ function offerVerdict(p, offer) {
   if (offer > p.prezzoConsigliato) return { cls: "giallo", txt: `🟡 Strappo ok (consigliato ${p.prezzoConsigliato})` };
   return { cls: "verde", txt: `🟢 Buon prezzo (≤ ${p.prezzoConsigliato})` };
 }
-// aggiorna il semaforo dal vivo mentre modifichi l'offerta, senza ridisegnare tutta la card
+// colora dal vivo il "consigliato" (ex-semaforo) mentre modifichi l'offerta
 function updateOfferSem() {
-  const el = document.getElementById("offerSem"); if (!el) return;
+  const el = document.getElementById("consVal"); if (!el) return;
   const p = selectedId ? boardPlayer(selectedId) : null; if (!p || p.taken) return;
   const inp = document.getElementById("priceInput");
   const offer = Math.max(1, Math.round(Number(inp?.value) || p.prezzoConsigliato));
-  const v = offerVerdict(p, offer);
-  el.className = `semaforo ${v.cls}`;
-  el.innerHTML = `<span class="dot"></span>${v.txt}`;
+  const cls = offerVerdict(p, offer).cls;
+  el.classList.remove("warn", "danger");
+  if (cls === "giallo") el.classList.add("warn");
+  else if (cls === "rosso") el.classList.add("danger");
 }
 
 // Area azioni di acquisto: cambia in base allo stato del flusso (idle/chooseOpp/confirm)
@@ -1354,6 +1357,25 @@ function wire() {
     if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
+    // doppio-tap sul nome (solo in modalità discreta): rivela/ricompatta le info del singolo
+    const nameEl = e.target.closest(".nome");
+    if (nameEl && document.body.classList.contains("discreet")) {
+      const inCard = nameEl.closest("#calledCard");
+      const row = nameEl.closest("#listoneList .row[data-pick]");
+      if (inCard || row) {
+        const now = Date.now();
+        const dbl = (now - _tapT < 320) && _tapEl === nameEl;
+        _tapT = now; _tapEl = nameEl;
+        if (inCard) {           // in Asta il nome non naviga: doppio-tap = toggle, singolo = niente
+          if (dbl) { _tapT = 0; document.getElementById("calledCard").classList.toggle("reveal"); }
+          return;
+        }
+        e.stopPropagation();     // LISTONE: singolo = seleziona (ritardato), doppio = reveal
+        if (dbl) { _tapT = 0; clearTimeout(_tapTimer); row.classList.toggle("reveal"); }
+        else { const id = row.dataset.pick; clearTimeout(_tapTimer); _tapTimer = setTimeout(() => selectPlayer(id), 320); }
+        return;
+      }
+    }
     const pick = e.target.closest("[data-pick]");
     if (pick) { selectPlayer(pick.dataset.pick); return; }
     const step = e.target.closest("[data-step]");

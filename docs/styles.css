@@ -6,8 +6,8 @@
   --text: #e2e8f0;
   --muted: #94a3b8;
   --line: #334155;
-  --accent: #16a34a;
-  --accent2: #22c55e;
+  --accent: #6366f1;
+  --accent2: #818cf8;
   --verde: #16a34a;
   --giallo: #d97706;
   --rosso: #dc2626;
@@ -37,7 +37,7 @@ header h1 em { font-style: normal; font-size: .6rem; font-weight: 800; letter-sp
 .disguise.ext { opacity: .55; border-color: var(--accent2); color: var(--accent2); }
 
 /* ===== MODALITÀ DISCRETA: l'app "piena" assume l'aspetto della LITE ===== */
-body.discreet { --accent: #6366f1; --accent2: #818cf8; }
+/* (l'accento è già indaco nel :root, sempre; qui restano solo badge + nascondigli) */
 body.discreet header h1 em { display: inline-block; }
 body.discreet .advonly { display: none !important; }
 body.discreet #calledCard .price-grid,
@@ -51,6 +51,17 @@ body:not(.showtabs) #tabs [data-screen="analisi"],
 body:not(.showtabs) #tabs [data-screen="formazione"] { display: none; }
 /* la LITE non ha barra budget: nascondila per non far notare la differenza */
 body.discreet #budgetBar { display: none !important; }
+/* doppio-tap sul nome: rivela le info del SINGOLO giocatore anche in discreta */
+body.discreet #calledCard.reveal .price-grid { display: grid !important; }
+body.discreet #calledCard.reveal .srcinfo,
+body.discreet #calledCard.reveal .injury { display: block !important; }
+body.discreet #calledCard.reveal .tier { display: inline-block !important; }
+body.discreet #calledCard.reveal .advonly,
+body.discreet #listoneList .row.reveal .advonly { display: inline !important; }
+.nome { cursor: pointer; -webkit-user-select: none; user-select: none; }
+/* consigliato: indaco di default, giallo/rosso se l'offerta sale troppo (ex-semaforo) */
+.price-grid .box .v.big.warn { color: var(--giallo); }
+.price-grid .box .v.big.danger { color: var(--rosso); }
 
 /* budget bar (sticky sotto header nella schermata asta) */
 .budget-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
