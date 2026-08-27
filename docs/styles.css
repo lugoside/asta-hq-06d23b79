@@ -37,8 +37,8 @@ header h1 em { font-style: normal; font-size: .6rem; font-weight: 800; letter-sp
 .disguise.ext { opacity: .55; border-color: var(--accent2); color: var(--accent2); }
 
 /* ===== MODALITÀ DISCRETA: l'app "piena" assume l'aspetto della LITE ===== */
-/* (l'accento è già indaco nel :root, sempre; qui restano solo badge + nascondigli) */
-body.discreet header h1 em { display: inline-block; }
+/* (l'accento è già indaco nel :root, sempre; qui restano solo i nascondigli) */
+/* badge "LITE" NON mostrato nemmeno in discreta: la differenza si capisce dal resto */
 body.discreet .advonly { display: none !important; }
 body.discreet #calledCard .price-grid,
 body.discreet #calledCard .semaforo,
