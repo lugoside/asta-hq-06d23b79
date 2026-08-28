@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v68"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v69"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -542,7 +542,7 @@ function renderAsta() {
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
         <div class="grow">
           <div class="nome">${esc(p.nome)}</div>
-          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]}<span class="advonly"> · valore ${p.valoreBase}</span></div>
+          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]}</div>
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
@@ -645,7 +645,6 @@ function renderListone() {
   if (ui.searchL) { const q = ui.searchL.toLowerCase(); list = list.filter((p) => p.nome.toLowerCase().includes(q) || p.squadra.toLowerCase().includes(q)); }
   const cmp = {
     consigliato: (a, b) => b.prezzoConsigliato - a.prezzoConsigliato,
-    valore: (a, b) => b.valoreBase - a.valoreBase,
     qi: (a, b) => (b.qa ?? b.qi ?? 0) - (a.qa ?? a.qi ?? 0),  // quotazione ATTUALE
     nome: (a, b) => a.nome.localeCompare(b.nome),
     squadra: (a, b) => a.squadra.localeCompare(b.squadra) || a.nome.localeCompare(b.nome),
@@ -660,7 +659,7 @@ function renderListone() {
       <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
       <span class="rp ${p.ruolo}">${p.ruolo}</span>
       <div class="grow"><div class="nome">${p.infortunato ? `<span class="advonly">🩹 </span>` : ""}${esc(p.nome)}</div>
-        <div class="meta">${esc(p.squadra)}<span class="advonly"> · ${p.tier}</span> · Quot ${p.qa ?? p.qi}<span class="advonly"> · val ${Math.round(p.valoreBase)}${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank ? ` · ⚽${p.rigoreRank}°` : ""}${p.punizioneRank ? ` · 🎯${p.punizioneRank}°` : ""}${p.cornerRank ? ` · 🚩${p.cornerRank}°` : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}</span>${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
+        <div class="meta">${esc(p.squadra)}<span class="advonly"> · ${p.tier}</span> · Quot ${p.qa ?? p.qi}<span class="advonly">${stat}${p.formazione ? " · " + FORM_SHORT[p.formazione] : ""}${p.rigoreRank ? ` · ⚽${p.rigoreRank}°` : ""}${p.punizioneRank ? ` · 🎯${p.punizioneRank}°` : ""}${p.cornerRank ? ` · 🚩${p.cornerRank}°` : ""}${p.infortunato ? " · 🩹 rientro " + esc(p.rientro || "?") : ""}</span>${p.taken ? " · preso " + teamName(p.takenBy) : ""}</div></div>
       <span class="price">${p.taken ? p.takenPrice : `<span class="advonly">${p.prezzoConsigliato}</span>`}</span>
     </div>`; }).join("") || `<div class="row"><span class="meta">Nessun giocatore.</span></div>`;
 }
