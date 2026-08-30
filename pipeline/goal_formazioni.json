@@ -11,8 +11,8 @@
         "Zappacosta",
         "Scalvini",
         "Kristensen",
-        "Ahanor",
-        "Samardzic",
+        "Bernasconi",
+        "Kessié",
         "Gaetano",
         "Ederson",
         "De Ketelaere",
@@ -21,7 +21,7 @@
       ],
       "ballottaggi": [
         "Hien",
-        "De Roon",
+        "Samardzic",
         "Pasalic",
         "Krstovic"
       ]
@@ -30,8 +30,8 @@
       "titolari": [
         "Skorupski",
         "Zortea",
-        "Vitik",
         "Heggem",
+        "Theate",
         "Miranda",
         "Ferguson",
         "El Azzouzi",
@@ -118,14 +118,14 @@
         "Ghedjemis",
         "Schmid",
         "Kvernadze",
-        "Raimondo"
+        "Bobcek"
       ],
       "ballottaggi": [
         "Calvani",
         "Terzic",
         "Masini",
-        "Fini",
-        "Zerbin"
+        "Zerbin",
+        "Raimondo"
       ]
     },
     "Genoa": {
@@ -240,12 +240,12 @@
         "Rabiot",
         "Bartesaghi",
         "Pulisic",
-        "Diego Moreira",
+        "Cissé",
         "Ramos"
       ],
       "ballottaggi": [
         "Jashari",
-        "Leao",
+        "Diego Moreira",
         "Saelemaekers"
       ]
     },
@@ -257,18 +257,18 @@
         "Carboni",
         "Touré",
         "Pessina",
-        "Akinsanmiro",
+        "Folorunsho",
         "Mangas",
         "Colpani",
-        "Cutrone",
+        "Ngonge",
         "Varela"
       ],
       "ballottaggi": [
         "Kouadio",
         "Mout",
         "Foet Ondoa",
-        "Colombo",
-        "Ciurria"
+        "Akinsanmiro",
+        "Cutrone"
       ]
     },
     "Napoli": {
@@ -345,32 +345,32 @@
         "Matic",
         "Adzic",
         "Berardi",
-        "Bowie",
+        "Esposito",
         "Lauriente"
       ],
       "ballottaggi": [
         "Doig",
         "Bakola",
-        "Volpato"
+        "Volpato",
+        "Bowie"
       ]
     },
     "Torino": {
       "titolari": [
-        "Mascardi",
-        "Ismajli",
-        "Coco",
+        "Lucas Perri",
         "Comuzzo",
+        "Coco",
+        "Comert",
         "Fortini",
         "Gineitis",
         "Fitz-Jim",
         "Cacciamani",
         "Vlasic",
-        "Casasei",
+        "Casadei",
         "Simeone"
       ],
       "ballottaggi": [
-        "Comert",
-        "Fortini",
+        "Ismajli",
         "Oristanio",
         "Adams"
       ]
