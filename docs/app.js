@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v69"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v70"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -542,7 +542,7 @@ function renderAsta() {
         <span class="rp ${p.ruolo}">${p.ruolo}</span>
         <div class="grow">
           <div class="nome">${esc(p.nome)}</div>
-          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi} · ${RUOLO_NOME[p.ruolo]}</div>
+          <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi}</div>
         </div>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
