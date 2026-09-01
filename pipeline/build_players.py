@@ -605,10 +605,15 @@ def fattore_goal(p: dict, ab: int, gb: int) -> float:
 
 def carica_raw() -> list[dict] | None:
     # preferisci il listone rifondato su fanta.it (versionato); fallback sul grezzo scaricato
+    import html
     for path in (LISTONE_BASE, RAW):
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+            for p in data:  # rete di sicurezza: nomi senza entità HTML (es. "M&#039;Bala" -> "M'Bala")
+                if p.get("nome"):
+                    p["nome"] = html.unescape(p["nome"])
+            return data
     return None
 
 

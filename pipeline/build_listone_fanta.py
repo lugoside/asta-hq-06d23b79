@@ -154,6 +154,12 @@ def main():
             })
             n_new += 1
 
+    # decodifica entità HTML nei nomi (es. "M&#039;Bala" -> "M'Bala"): i vecchi record
+    # fantacalcio-online (giocatori "matchati") possono portare entità non decodificate.
+    for p in listone:
+        if p.get("nome"):
+            p["nome"] = html.unescape(p["nome"])
+
     # override nome per fantaId (name_fixes.fixes), dopo il merge
     n_fix = 0
     for p in listone:
