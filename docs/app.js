@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v70"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v71"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1485,6 +1485,7 @@ function wire() {
   document.getElementById("showTabsToggle").addEventListener("click", () => setShowTabs(!SHOWTABS));
   applyDisguise(); // applica subito l'aspetto salvato (evita il flash della vista piena)
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
+  document.getElementById("exportCsvBtn").addEventListener("click", exportImportCSV);
   document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
   document.getElementById("importFile").addEventListener("change", importBackup);
   setupTeamDnD();
@@ -1504,6 +1505,55 @@ function exportBackup() {
   a.download = `fantaasta-backup.json`;
   a.click(); URL.revokeObjectURL(a.href);
   toast("Backup esportato");
+}
+
+// Mappa nome-squadra APP (nome del manager in teams[]) -> nome-squadra sul sito fantacalcio.it.
+// GEMELLA di pipeline/team_map.json (tenere allineate a mano). Verificata 10/10 al carattere
+// contro l'export "ROSE" del sito (1/9). Serve a generare il CSV d'import direttamente dal telefono.
+const SITE_TEAM_MAP = {
+  "Valerio": "Osasuca",
+  "Giacomo": "Gabinettese ASD",
+  "Enrico": "Real Colizzati",
+  "Beto": "AstonVilla",
+  "Ale": "Borussia Porkmund",
+  "Pier": "VIS Pierborough 1993 Football Club",
+  "Santo": "Breaking Bald",
+  "Filo": "PirazSanGermain",
+  "Gian Luca": "Jelluk FC",
+  "Giosia": "BirraReal",
+};
+
+// Costruisce il CSV importabile su fantacalcio.it (Gestione rose -> Importa):
+//   riga 1: $,$,$   poi righe: <NomeSquadraSito>,<idFanta>,<costo>   (LF, un record per riga)
+// Replica pipeline/make_fanta_import.py lato client. Ritorna { csv, n, missing[] }.
+function buildImportCsv() {
+  const rows = [], missing = [];
+  for (const pu of PURCHASES) {
+    const pl = PLAYERS.find((x) => x.id === pu.playerId);
+    const fid = pl && pl.fantaId;
+    const appName = pu.team === MY_TEAM ? CONFIG.myTeam : pu.team;   // MY_TEAM -> nome reale della mia squadra
+    const siteName = SITE_TEAM_MAP[appName] || appName;             // fallback: nome così com'è
+    if (!fid) { missing.push(pu.nome || pu.playerId); continue; }
+    rows.push(`${siteName},${fid},${Math.max(1, Math.round(pu.price || 1))}`);
+  }
+  return { csv: "$,$,$\n" + rows.map((r) => r + "\n").join(""), n: rows.length, missing };
+}
+
+// Esporta le rose in CSV. Su telefono apre la condivisione (→ mail/Drive…), altrimenti scarica il file.
+async function exportImportCSV() {
+  const { csv, n, missing } = buildImportCsv();
+  if (!n) { toast("Nessun acquisto da esportare"); return; }
+  const warn = missing.length ? ` — ⚠️ ${missing.length} senza id (a mano)` : "";
+  const file = new File([csv], "fanta_import.csv", { type: "text/csv" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "Rose fantacalcio" }); toast(`CSV condiviso (${n} giocatori)${warn}`); return; }
+    catch (e) { if (e && e.name === "AbortError") return; /* condivisione annullata */ }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file);
+  a.download = "fanta_import.csv";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`CSV esportato (${n} giocatori)${warn}`);
 }
 function importBackup(e) {
   if (auctionClosed()) { e.target.value = ""; return; }
