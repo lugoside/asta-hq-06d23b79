@@ -13,7 +13,7 @@
         "Kristensen",
         "Scalvini",
         "Bernasconi",
-        "Samardzic",
+        "Kessie",
         "Gaetano",
         "Ederson",
         "De Ketelaere",
@@ -25,12 +25,12 @@
         "Zappacosta",
         "Kristensen",
         "Hien",
+        "Kessie",
         "Samardzic",
+        "Kessie",
         "Pasalic",
         "Scamacca",
-        "Krstovic",
-        "Raspadori",
-        "Elmas"
+        "Krstovic"
       ],
       "rigoristi": [
         "Scamacca",
@@ -48,26 +48,25 @@
       "titolari": [
         "Skorupski",
         "Zortea",
-        "Vitik",
         "Heggem",
+        "Theate",
         "Miranda",
         "Ferguson",
-        "Moro",
+        "Pobega",
         "Odgaard",
         "Orsolini",
-        "Dovbyk"
+        "Dovbyk",
+        "Cambiaghi"
       ],
       "ballottaggi": [
-        "Moro",
-        "Amondarain",
-        "Odgaard",
         "Pobega",
+        "Moro",
+        "Odgaard",
+        "Amondarain",
         "Orsolini",
         "Bernardeschi",
-        "Rowe",
-        "Cambiaghi",
-        "Dovbyk",
-        "Piccoli"
+        "Piccoli",
+        "Dovbyk"
       ],
       "rigoristi": [
         "Orsolini",
@@ -81,7 +80,7 @@
       ]
     },
     "Cagliari": {
-      "modulo": "4-3-2-1",
+      "modulo": "4-4-2",
       "titolari": [
         "Caprile",
         "Ze Pedro",
@@ -91,8 +90,8 @@
         "Adopo",
         "Winks",
         "Romano",
-        "Maldini",
         "Fazzini",
+        "Maldini",
         "Kevin Carlos"
       ],
       "ballottaggi": [
@@ -132,8 +131,6 @@
       "ballottaggi": [
         "Couto",
         "Smolcic",
-        "Chalobah",
-        "Kempf",
         "Kaiki",
         "Valle",
         "Diao",
@@ -164,7 +161,7 @@
         "Atta",
         "Mastantuono",
         "Pellegrino",
-        "Gudmundsson"
+        "Njie"
       ],
       "ballottaggi": [
         "Jimenez",
@@ -173,8 +170,8 @@
         "Ranieri",
         "Oulai",
         "Fagioli",
-        "Ndour",
-        "Mandragora"
+        "Njie",
+        "Gudmundsson"
       ],
       "rigoristi": [
         "Gudmundsson",
@@ -191,7 +188,7 @@
       "modulo": "4-2-3-1",
       "titolari": [
         "Palmisani",
-        "A. Oyono",
+        "Tchato",
         "Calvani",
         "Monterisi",
         "Bracaglia",
@@ -203,21 +200,19 @@
         "Raimondo"
       ],
       "ballottaggi": [
+        "Tchato",
         "Oyono",
-        "Cittadini",
-        "Calvani",
-        "Akpoguma",
         "Bracaglia",
         "Terzic",
         "Grillitsch",
         "Cichella",
-        "Ghedjemis",
-        "Zerbin"
+        "Raimondo",
+        "Bobcek"
       ],
       "rigoristi": [
         "Calò",
         "Schimd",
-        "Grillitsch"
+        "Bobcek"
       ],
       "punizioni": [
         "Calò",
@@ -232,17 +227,17 @@
         "Marcandalli",
         "Ostigard",
         "Vasquez",
-        "Norton-Cuffy",
+        "Ellertsson",
         "Frendrup",
         "Sow",
-        "Ellertsson",
+        "Mitaj",
         "Baldanzi",
         "Vitinha",
         "Colombo"
       ],
       "ballottaggi": [
-        "Ellertsson",
         "Mitaj",
+        "Puczka",
         "Sow",
         "Amorim",
         "Baldanzi",
@@ -306,9 +301,9 @@
         "Kalulu",
         "Bremer",
         "Lucumì",
-        "Cambiaso",
+        "Celik",
         "Locatelli",
-        "Thuram",
+        "Douglas Luiz",
         "Conceicao",
         "McKennie",
         "Yildiz",
@@ -317,9 +312,13 @@
       "ballottaggi": [
         "Lucumì",
         "Kelly",
-        "Cambiaso",
         "Celik",
-        "Thuram"
+        "Cambiaso",
+        "Douglas Luiz",
+        "Yildiz",
+        "Boga",
+        "Yildiz",
+        "Alajbegovic"
       ],
       "rigoristi": [
         "Kolo Muani",
@@ -329,7 +328,7 @@
       "punizioni": [
         "Yildiz",
         "Locatelli",
-        "Cambiaso"
+        "Douglas Luiz"
       ]
     },
     "Lazio": {
@@ -339,27 +338,27 @@
         "Marusic",
         "Sutalo",
         "Romagnoli",
-        "Pedraza",
+        "Tavares",
         "Frattesi",
         "Rovella",
         "Taylor",
         "Isaksen",
-        "Dia",
+        "Pinamonti",
         "Zaccagni"
       ],
       "ballottaggi": [
-        "Romagnoli",
+        "Marusic",
+        "Floriani",
+        "Sutalo",
         "Doekhi",
-        "Pedraza",
         "Tavares",
+        "Pedraza",
         "Isaksen",
-        "Cancellieri",
-        "Dia",
-        "Noslin"
+        "Cancellieri"
       ],
       "rigoristi": [
         "Zaccagni",
-        "Taylor",
+        "Pinamonti",
         "Cataldi"
       ],
       "punizioni": [
@@ -377,23 +376,23 @@
         "Tiago Gabriel",
         "Gallo",
         "Coulibaly",
-        "Ngom",
+        "Ilic",
         "Berisha",
         "Pierotti",
         "Geubbels",
-        "N’Dri"
+        "Monteiro"
       ],
       "ballottaggi": [
         "Tiago Gabriel",
         "Siebert",
+        "Ilic",
         "Ngom",
-        "Gorter",
         "Berisha",
         "Gandelman",
-        "N'Dri",
-        "Fatah",
         "Geubbels",
-        "Stulic"
+        "Stulic",
+        "Monteiro",
+        "Fatah"
       ],
       "rigoristi": [
         "Geubbels",
@@ -415,18 +414,21 @@
         "Pavlovic",
         "Moreira",
         "Modric",
-        "Rabiot",
+        "Musah",
         "Bartesaghi",
+        "Rabiot",
         "Pulisic",
-        "Cisse",
         "Ramos"
       ],
       "ballottaggi": [
+        "Gabbia",
+        "De Winter",
         "Bartesaghi",
+        "Musah",
         "Pulisic",
-        "Loftus-Cheek",
-        "Cisse",
-        "Leao"
+        "Saelemaekers",
+        "Pulisic",
+        "Cisse"
       ],
       "rigoristi": [
         "Ramos",
@@ -442,29 +444,32 @@
     "Monza": {
       "modulo": "3-4-2-1",
       "titolari": [
-        "Thiam",
+        "Tornqvist",
         "Kouadio",
-        "Lucchesi",
+        "Ziolkowski",
         "Carboni",
         "Birindelli",
         "Tourè",
         "Akinsanmiro",
         "Mangas",
         "Colpani",
-        "Cutrone",
+        "Folorunsho",
         "Varela"
       ],
       "ballottaggi": [
+        "Ziolkowski",
         "Lucchesi",
-        "Delli Carri Colpani",
-        "Forson",
-        "Cutrone",
-        "Mota"
+        "Tourè",
+        "Mout",
+        "Colpani",
+        "Ngonge",
+        "Varela",
+        "Cutrone"
       ],
       "rigoristi": [
         "Pessina",
         "Cutrone",
-        "Petagna"
+        "Varela"
       ],
       "punizioni": [
         "Pessina",
@@ -478,7 +483,7 @@
         "Meret",
         "Di Lorenzo",
         "Rrahmani",
-        "Buongiorno",
+        "Badiashile",
         "Spinazzola",
         "De Bruyne",
         "Lobotka",
@@ -488,13 +493,13 @@
         "Alisson Santos"
       ],
       "ballottaggi": [
-        "Buongiorno",
         "Badiashile",
+        "Buongiorno",
         "Spinazzola",
         "Olivera",
         "De Bruyne",
         "Anguissa",
-        "De Bruyne",
+        "Politano",
         "Vergara",
         "Politano",
         "Neres"
@@ -511,17 +516,17 @@
       ]
     },
     "Parma": {
-      "modulo": "4-3-3",
+      "modulo": "4-3-1-2",
       "titolari": [
         "Corvi",
         "Delprato",
         "Troilo",
         "Valenti",
         "Valeri",
-        "Bernabè",
+        "Fabbian",
         "Keita",
-        "Sorensen",
-        "Frigan",
+        "Ordonez",
+        "Bernabè",
         "Romero",
         "Tourè"
       ],
@@ -530,12 +535,9 @@
         "Daffara",
         "Valenti",
         "Ndiaye",
-        "Sorensen",
-        "Ordonez",
-        "Frigan",
-        "Diallo",
         "Romero",
-        "Elphege"
+        "Elphege",
+        "Fabbian"
       ],
       "rigoristi": [
         "Tourè",
@@ -567,7 +569,7 @@
         "Hermoso",
         "Koulierakis",
         "Mora",
-        "Pellegrini",
+        "Soulè",
         "Dybala"
       ],
       "rigoristi": [
@@ -585,32 +587,30 @@
       "modulo": "4-3-3",
       "titolari": [
         "Muric",
-        "Walukiewicz",
+        "Van der Brempt",
         "Idzes",
-        "Leysen",
+        "Caleta-Car",
         "Obrador",
-        "Bakola",
+        "Thorstvedt",
         "Matic",
         "Adzic",
         "Berardi",
-        "Bowie",
+        "Esposito",
         "Laurientè"
       ],
       "ballottaggi": [
+        "Caleta-Car",
         "Leysen",
-        "Candè",
         "Obrador",
         "Doig",
-        "Bakola",
-        "Thorstvedt",
         "Adzic",
-        "Lipani",
-        "Bowie",
-        "Pinamonti"
+        "Bakola",
+        "Esposito",
+        "Bowie"
       ],
       "rigoristi": [
         "Berardi",
-        "Pinamonti",
+        "Esposito",
         "Laurientè"
       ],
       "punizioni": [
@@ -622,11 +622,11 @@
     "Torino": {
       "modulo": "3-4-2-1",
       "titolari": [
-        "Mascardi",
+        "Perri",
         "Comuzzo",
         "Coco",
         "Comert",
-        "Pedersen",
+        "Belghali",
         "Gineitis",
         "Fitz-Jim",
         "Cacciamani",
@@ -637,12 +637,14 @@
       "ballottaggi": [
         "Coco",
         "Ismajli",
-        "Pedersen",
+        "Belghali",
+        "Patterson",
+        "Cacciamani",
         "Fortini",
         "Casadei",
         "Oristanio",
         "Casadei",
-        "Njie"
+        "Adams"
       ],
       "rigoristi": [
         "Vlasic",
@@ -672,7 +674,7 @@
       ],
       "ballottaggi": [
         "Palma",
-        "Bertola",
+        "Abankwah",
         "Piotrowski",
         "Miller"
       ],
@@ -693,21 +695,23 @@
         "Stankovic",
         "Schingtienne",
         "Bella-Kotchap",
-        "Halhal",
-        "Hainaut",
+        "Juan Jesus",
+        "Mazzocchi",
         "Kike Perez",
         "Busio",
         "Basic",
-        "Correia",
+        "Haps",
         "Yeboah",
         "Akor Adams"
       ],
       "ballottaggi": [
+        "Juan Jesus",
         "Halhal",
-        "Moreno",
-        "Correia",
+        "Mazzocchi",
+        "Hainaut",
         "Haps",
-        "Kike Perez",
+        "Correia",
+        "Perez",
         "Sohm",
         "Adams",
         "Rrahmani"
