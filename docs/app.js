@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v71"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v72"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -544,6 +544,7 @@ function renderAsta() {
           <div class="nome">${esc(p.nome)}</div>
           <div class="sub">${esc(p.squadra)} · Quot ${p.qa ?? p.qi}</div>
         </div>
+        <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}" title="${FAVORITES.has(p.id) ? "Togli dagli obiettivi" : "Aggiungi agli obiettivi"}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
       ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.injuryFactor && Math.round((1 - p.injuryFactor) * 100) >= 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
@@ -1495,6 +1496,7 @@ function toggleFav(id) {
   if (FAVORITES.has(id)) FAVORITES.delete(id); else FAVORITES.add(id);
   save(LS.fav, [...FAVORITES]); // i preferiti sono personali: solo locali, non vanno sul cloud
   if (ui.screen === "listone") renderListone();
+  else if (ui.screen === "asta") { captureBuyPrice(); renderAsta(); } // aggiorna la stellina nella card Asta senza perdere il prezzo digitato
 }
 
 function exportBackup() {
