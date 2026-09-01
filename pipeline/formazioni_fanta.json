@@ -18,7 +18,7 @@
         "Ederson",
         "De Ketelaere",
         "Scamacca",
-        "Raspadori"
+        "Rowe"
       ],
       "ballottaggi": [
         "Bellanova",
@@ -27,10 +27,10 @@
         "Hien",
         "Kessie",
         "Samardzic",
-        "Kessie",
-        "Pasalic",
         "Scamacca",
-        "Krstovic"
+        "Krstovic",
+        "Rowe",
+        "Raspadori"
       ],
       "rigoristi": [
         "Scamacca",
@@ -51,9 +51,9 @@
         "Heggem",
         "Theate",
         "Miranda",
+        "Odgaard",
         "Ferguson",
         "Pobega",
-        "Odgaard",
         "Orsolini",
         "Dovbyk",
         "Cambiaghi"
@@ -66,7 +66,9 @@
         "Orsolini",
         "Bernardeschi",
         "Piccoli",
-        "Dovbyk"
+        "Dovbyk",
+        "Cambiaghi",
+        "Mbangula"
       ],
       "rigoristi": [
         "Orsolini",
@@ -95,16 +97,16 @@
         "Kevin Carlos"
       ],
       "ballottaggi": [
-        "Rodriguez",
-        "Kofler",
-        "Maldini",
+        "Zè Pedro",
+        "Sugawara",
+        "Adopo",
         "Fadera",
         "Kevin Carlos",
-        "Mendy"
+        "Nzola"
       ],
       "rigoristi": [
+        "Nzola",
         "Kevin Carlos",
-        "Maldini",
         "Mina"
       ],
       "punizioni": [
@@ -120,27 +122,29 @@
         "Couto",
         "Chalobah",
         "Ramon",
-        "Kaiki",
+        "Valle",
         "Da Cunha",
         "Perrone",
         "Diao",
         "Paz",
         "Baturina",
-        "Douvikas"
+        "Kean"
       ],
       "ballottaggi": [
         "Couto",
         "Smolcic",
-        "Kaiki",
         "Valle",
+        "Kaiki",
         "Diao",
         "Rodriguez",
-        "Baturina"
+        "Baturina",
+        "Kean",
+        "Douvikas"
       ],
       "rigoristi": [
         "Da Cunha",
-        "Douvikas",
-        "Paz"
+        "Kean",
+        "Douvikas"
       ],
       "punizioni": [
         "Paz",
@@ -157,31 +161,33 @@
         "Viery",
         "Valdepenas",
         "Ndour",
-        "Oulai",
+        "Fagioli",
         "Atta",
         "Mastantuono",
-        "Pellegrino",
-        "Njie"
+        "Beto",
+        "Goncalves"
       ],
       "ballottaggi": [
         "Jimenez",
         "Joao Mario",
         "Viery",
         "Ranieri",
-        "Oulai",
         "Fagioli",
+        "Oulai",
+        "Goncalves",
         "Njie",
-        "Gudmundsson"
+        "Beto",
+        "Pellegrino"
       ],
       "rigoristi": [
-        "Gudmundsson",
+        "Beto",
         "Pellegrino",
-        "Mandragora"
+        "Goncalves"
       ],
       "punizioni": [
-        "Gudmundsson",
         "Mastantuono",
-        "Atta"
+        "Atta",
+        "Goncalves"
       ]
     },
     "Frosinone": {
@@ -207,7 +213,9 @@
         "Grillitsch",
         "Cichella",
         "Raimondo",
-        "Bobcek"
+        "Bobcek",
+        "Ghedjemis",
+        "Zerbin"
       ],
       "rigoristi": [
         "Calò",
@@ -240,11 +248,7 @@
         "Puczka",
         "Sow",
         "Amorim",
-        "Baldanzi",
-        "Traoré",
         "Vitinha",
-        "Meichtry",
-        "Colombo",
         "Osmajic"
       ],
       "rigoristi": [
@@ -254,8 +258,8 @@
       ],
       "punizioni": [
         "Baldanzi",
-        "Martin",
-        "Vitinha"
+        "Vitinha",
+        "Messias"
       ]
     },
     "Inter": {
@@ -303,10 +307,10 @@
         "Lucumì",
         "Celik",
         "Locatelli",
-        "Douglas Luiz",
+        "Sarr",
         "Conceicao",
         "McKennie",
-        "Yildiz",
+        "Gonzalez",
         "Kolo Muani"
       ],
       "ballottaggi": [
@@ -314,16 +318,17 @@
         "Kelly",
         "Celik",
         "Cambiaso",
+        "Sarr",
         "Douglas Luiz",
-        "Yildiz",
-        "Boga",
-        "Yildiz",
-        "Alajbegovic"
+        "Nico Gonzalez",
+        "Alajbegovic",
+        "Kolo Muani",
+        "Woltemade"
       ],
       "rigoristi": [
         "Kolo Muani",
-        "Yildiz",
-        "Locatelli"
+        "Woltemade",
+        "Gonzalez"
       ],
       "punizioni": [
         "Yildiz",
@@ -354,17 +359,19 @@
         "Tavares",
         "Pedraza",
         "Isaksen",
-        "Cancellieri"
+        "Cancellieri",
+        "Pinamonti",
+        "Gudmundsson"
       ],
       "rigoristi": [
         "Zaccagni",
         "Pinamonti",
-        "Cataldi"
+        "Gudmundsson"
       ],
       "punizioni": [
         "Rovella",
         "Zaccagni",
-        "Cataldi"
+        "Gudmundsson"
       ]
     },
     "Lecce": {
@@ -383,8 +390,6 @@
         "Monteiro"
       ],
       "ballottaggi": [
-        "Tiago Gabriel",
-        "Siebert",
         "Ilic",
         "Ngom",
         "Berisha",
@@ -452,29 +457,30 @@
         "Tourè",
         "Akinsanmiro",
         "Mangas",
-        "Colpani",
+        "Ngonge",
         "Folorunsho",
         "Varela"
       ],
       "ballottaggi": [
         "Ziolkowski",
         "Lucchesi",
+        "Ngonge",
+        "Colpani",
+        "Varela",
+        "Cutrone",
         "Tourè",
         "Mout",
-        "Colpani",
-        "Ngonge",
-        "Varela",
-        "Cutrone"
+        "Birindelli"
       ],
       "rigoristi": [
-        "Pessina",
         "Cutrone",
-        "Varela"
+        "Varela",
+        "Ngonge"
       ],
       "punizioni": [
-        "Pessina",
-        "Colpani",
-        "Mota"
+        "Ngonge",
+        "Folorunsho",
+        "Pessina"
       ]
     },
     "Napoli": {
@@ -521,7 +527,7 @@
         "Corvi",
         "Delprato",
         "Troilo",
-        "Valenti",
+        "Diego Carlos",
         "Valeri",
         "Fabbian",
         "Keita",
@@ -533,8 +539,6 @@
       "ballottaggi": [
         "Corvi",
         "Daffara",
-        "Valenti",
-        "Ndiaye",
         "Romero",
         "Elphege",
         "Fabbian"
@@ -627,7 +631,7 @@
         "Coco",
         "Comert",
         "Belghali",
-        "Gineitis",
+        "Mandragora",
         "Fitz-Jim",
         "Cacciamani",
         "Casadei",
@@ -642,18 +646,18 @@
         "Cacciamani",
         "Fortini",
         "Casadei",
-        "Oristanio",
+        "Braganca",
         "Casadei",
         "Adams"
       ],
       "rigoristi": [
         "Vlasic",
-        "Kulenovic",
-        "Simeone"
+        "Simeone",
+        "Mandragora"
       ],
       "punizioni": [
         "Vlasic",
-        "Oristanio",
+        "Mandragora",
         "Gineitis"
       ]
     },
