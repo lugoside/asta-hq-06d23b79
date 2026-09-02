@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v72"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v73"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -515,6 +515,26 @@ function renderBudgetBar() {
     .join("");
 }
 
+// Stima l'ORDINE DI GRANDEZZA del rientro dal tipo di infortunio, quando la fonte
+// non dà una data ("tempi da valutare"). Serve a capire a colpo d'occhio se è cosa
+// da settimane o da mesi. Ordine dal più grave al più lieve (vince il primo match).
+function stimaRientro(motivo) {
+  const t = (motivo || "").toLowerCase();
+  if (/crociat|tendine d.?achille|\bachille\b/.test(t)) return "diversi mesi";
+  if (/frattur/.test(t)) return "~1-2 mesi";
+  if (/oper(a|ato|arsi|azione)|intervento chirurg|chirurgic/.test(t)) return "settimane/mesi";
+  if (/lesion/.test(t)) return "~1 mese";
+  if (/stirament|distorsion|elongazion/.test(t)) return "~2-4 settimane";
+  if (/risentiment|affaticament|fastidio|fatica muscolare|sovraccarico|contrattur|problema muscolare/.test(t)) return "~1-3 settimane";
+  return "";
+}
+// Frase "rientro …" per la scheda: data reale se c'è, altrimenti la stima, altrimenti "da valutare".
+function testoRientro(p) {
+  if (p.rientro) return `rientro previsto <b>${esc(p.rientro)}</b>`;
+  const s = stimaRientro(p.motivoInfortunio);
+  return s ? `rientro da valutare (stima <b>${esc(s)}</b>)` : "rientro <b>da valutare</b>";
+}
+
 // ---- ASTA ----
 function renderAsta() {
   const ban = document.getElementById("auctionBanner");
@@ -547,7 +567,7 @@ function renderAsta() {
         <button class="star ${FAVORITES.has(p.id) ? "on" : ""}" data-fav="${p.id}" title="${FAVORITES.has(p.id) ? "Togli dagli obiettivi" : "Aggiungi agli obiettivi"}">${FAVORITES.has(p.id) ? "★" : "☆"}</button>
         <span class="tier ${p.tier}">${p.tier}</span>
       </div>
-      ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — rientro previsto ${esc(p.rientro || "?")}${p.injuryFactor && Math.round((1 - p.injuryFactor) * 100) >= 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
+      ${p.infortunato ? `<div class="injury">🩹 <b>Infortunato</b> — ${testoRientro(p)}${p.injuryFactor && Math.round((1 - p.injuryFactor) * 100) >= 1 ? ` · malus <b>−${Math.round((1 - p.injuryFactor) * 100)}%</b> sul valore` : ""}${p.motivoInfortunio ? `<br><span class="im">${esc(p.motivoInfortunio)}</span>` : ""}</div>` : ""}
       <div class="price-grid">
         <div class="box"><div class="v big${consCls}" id="consVal">${p.prezzoConsigliato}</div><div class="l">consigliato</div></div>
         <div class="box"><div class="v">${p.prezzoMax}</div><div class="l">max strappo</div></div>
