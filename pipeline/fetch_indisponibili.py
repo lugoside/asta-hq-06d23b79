@@ -37,8 +37,9 @@ def parse(html: str) -> list[dict]:
         if not tm:
             continue
         team = ihtml.unescape(tm.group(1)).strip()
-        # isola la sezione "Infortunati": la prima <ul class="unstyled"> dopo l'etichetta
-        im = re.search(r'Infortunati\s*</strong>.*?<ul class="unstyled">(.*?)</ul>', part, re.S)
+        # isola la sezione "Infortunati": la prima <ul class="unstyled"> dopo l'etichetta.
+        # L'etichetta ora è dentro un header con <a> (prima era </strong>): accetta entrambi.
+        im = re.search(r'Infortunati\s*</(?:a|strong)>.*?<ul class="unstyled">(.*?)</ul>', part, re.S)
         if not im:
             continue
         teams_seen.add(team)
