@@ -58,13 +58,12 @@
         "Winks",
         "Romano",
         "Maldini",
-        "Kevin Carlos",
+        "Nzola",
         "Fazzini"
       ],
       "ballottaggi": [
         "Rodriguez",
-        "Deiola",
-        "Felici"
+        "Deiola"
       ]
     },
     "Como": {
@@ -84,7 +83,8 @@
       "ballottaggi": [
         "Valle",
         "Kempf",
-        "Milla"
+        "Milla",
+        "Kean"
       ]
     },
     "Fiorentina": {
@@ -105,6 +105,7 @@
         "Pongracic",
         "Joao Mario",
         "Oulai",
+        "Njie",
         "Beto"
       ]
     },
@@ -117,7 +118,7 @@
         "Bracaglia",
         "Masini",
         "Calò",
-        "Fini",
+        "Ghedjemis",
         "Schmid",
         "Kvernadze",
         "Raimondo"
@@ -125,7 +126,7 @@
       "ballottaggi": [
         "Terzic",
         "Grilitsch",
-        "Zerbin"
+        "Fini"
       ]
     },
     "Genoa": {
@@ -157,7 +158,7 @@
         "Spence",
         "Barella",
         "Calhanoglu",
-        "Sucic",
+        "Zielinski",
         "Dimarco",
         "Lautaro",
         "Thuram"
@@ -165,7 +166,8 @@
       "ballottaggi": [
         "Stones",
         "Diouf",
-        "Zielinski"
+        "Sucic",
+        "Pio Esposito"
       ]
     },
     "Juventus": {
@@ -174,7 +176,7 @@
         "Kalulu",
         "Bremer",
         "Lucumì",
-        "Cambiaso",
+        "Celik",
         "Locatelli",
         "Sarr",
         "Conceiçao",
@@ -183,10 +185,9 @@
         "Kolo Muani"
       ],
       "ballottaggi": [
-        "Celik",
         "Douglas Luiz",
         "Boga",
-        "Alajbegovic"
+        "Woltemade"
       ]
     },
     "Lazio": {
@@ -207,7 +208,7 @@
         "Provstgaard",
         "Pedraza",
         "Cataldi",
-        "Cancellieri"
+        "Gudmundsson"
       ]
     },
     "Lecce": {
@@ -279,7 +280,7 @@
         "Meret",
         "Di Lorenzo",
         "Rrahmani",
-        "Badiashile",
+        "Beukema",
         "Spinazzola",
         "De Bruyne",
         "Lobotka",
@@ -289,7 +290,7 @@
         "Alisson"
       ],
       "ballottaggi": [
-        "Beukema",
+        "Badiashile",
         "Olivera",
         "Anguissa",
         "Neres"
@@ -310,10 +311,9 @@
         "Touré"
       ],
       "ballottaggi": [
-        "Sorensen",
-        "Diallo",
-        "Romero",
-        "Elphege"
+        "Britschgi",
+        "Nicolussi Caviglia",
+        "Romero"
       ]
     },
     "Roma": {
@@ -332,7 +332,7 @@
       ],
       "ballottaggi": [
         "Balerdi",
-        "Koulierakis",
+        "De Roon",
         "Pellegrini",
         "Soulé"
       ]
@@ -365,7 +365,7 @@
         "Coco",
         "Comert",
         "Belghali",
-        "Gineitis",
+        "Mandragora",
         "Fitz-Jim",
         "Cacciamani",
         "Vlasic",
@@ -375,6 +375,7 @@
       "ballottaggi": [
         "Ismajli",
         "Fortini",
+        "Braganca",
         "Adams"
       ]
     },
