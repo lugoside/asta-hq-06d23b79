@@ -21,6 +21,29 @@ OUT = os.path.join(HERE, "raw", "indisponibili.json")
 URL = "https://www.fantacalcio.it/indisponibili-serie-a"
 MIN_TEAMS = 15  # sotto questa soglia lo scrape è considerato fallito
 
+MESI = {"gennaio": 1, "febbraio": 2, "marzo": 3, "aprile": 4, "maggio": 5, "giugno": 6,
+        "luglio": 7, "agosto": 8, "settembre": 9, "ottobre": 10, "novembre": 11, "dicembre": 12}
+
+
+def rientro_testuale(desc: str) -> str:
+    """Estrae una data di rientro APPROSSIMATA da descrizioni in prosa quando NON c'è
+    una data numerica: es. 'rientro da gennaio' -> 15/01/2027, 'da inizio ottobre' ->
+    05/10/2026. Àncora su un verbo di rientro (rientro/recupero/torna/arruolabile…) per
+    NON confondersi con la data d'infortunio (es. 'KO a fine agosto'). Stagione 2026/27:
+    mesi ago..dic = 2026, gen..lug = 2027."""
+    frac_re = r"(prima met[àa]|seconda met[àa]|inizio|met[àa]|fine)"
+    m = re.search(
+        r"(?:rientr\w*|recuper\w*|tornar?\w*|arruolabil\w*|convocabil\w*|disponibil\w*)"
+        r"[^.]{0,60}?" + frac_re + r"?\s*(?:di\s+|del\s+|d['’]\s*)?(" + "|".join(MESI) + r")",
+        desc, re.I)
+    if not m:
+        return ""
+    frac = re.sub(r"\s+", " ", (m.group(1) or "").lower()).replace("à", "a")
+    day = {"inizio": 5, "prima meta": 10, "meta": 15, "seconda meta": 20, "fine": 25}.get(frac, 15)
+    mese = MESI[m.group(2).lower()]
+    year = 2026 if mese >= 8 else 2027
+    return f"{day:02d}/{mese:02d}/{year}"
+
 
 def fetch_html(url: str) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -50,12 +73,13 @@ def parse(html: str) -> list[dict]:
             nome = ihtml.unescape(nm.group(1)).strip()
             desc = re.sub(r'<[^>]+>', ' ', li)
             desc = re.sub(r'\s+', ' ', ihtml.unescape(desc)).strip()
-            dm = re.search(r'\b(\d{1,2}/\d{1,2}(?:/\d{4})?)\b', desc)  # data solo se numerica
+            dm = re.search(r'\b(\d{1,2}/\d{1,2}(?:/\d{4})?)\b', desc)  # preferisci la data numerica…
+            rientro = dm.group(1) if dm else rientro_testuale(desc)   # …altrimenti quella testuale
             out.append({
                 "squadra": team,
                 "nome": nome,
-                "motivo": desc[:180],
-                "rientro": dm.group(1) if dm else "",
+                "motivo": desc[:240],
+                "rientro": rientro,
                 "fonte": "fantacalcio.it/indisponibili",
             })
     return out, len(teams_seen)
@@ -76,7 +100,7 @@ def main():
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     con_data = sum(1 for x in data if x["rientro"])
-    print(f"OK: {len(data)} infortunati da {nteams} club -> {OUT}  (con data numerica: {con_data})")
+    print(f"OK: {len(data)} infortunati da {nteams} club -> {OUT}  (con data di rientro: {con_data})")
     return 0
 
 
