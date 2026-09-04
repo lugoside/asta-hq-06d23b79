@@ -13,6 +13,7 @@ const LS = {
   unlocked: "fa_unlocked", // gate master password superato su questo dispositivo
   discreet: "fa_discreet", // modalità discreta (aspetto LITE, consigli nascosti a colpo d'occhio)
   showtabs: "fa_showtabs", // schede avanzate Analisi/Formazione visibili
+  anCollapsed: "fa_an_collapsed", // stato comprimi/espandi delle sezioni della tab Analisi
 };
 // Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
 // i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
@@ -24,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v75"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v76"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -152,6 +153,29 @@ function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); 
 // --- camuffamento: modalità discreta (aspetto LITE) + schede avanzate ----------
 let DISCREET = load(LS.discreet, true);   // default: discreta (sicura sotto asta)
 let SHOWTABS = load(LS.showtabs, false);  // default: Analisi/Formazione nascoste
+// stato comprimi/espandi delle sezioni Analisi ({chiave:true=compressa}); default in AN_DEFAULT_COLLAPSED
+let AN_COLLAPSED = load(LS.anCollapsed, {}) || {};
+let anClubTeam = null; // squadra selezionata nella sezione "Acquisti per club" (null = la mia)
+const AN_DEFAULT_COLLAPSED = new Set(["club", "classifica", "affari", "salassi", "stagionale"]);
+function anSection(key, title, bodyHtml) {
+  const collapsed = key in AN_COLLAPSED ? AN_COLLAPSED[key] : AN_DEFAULT_COLLAPSED.has(key);
+  return `<div class="an-sec${collapsed ? " collapsed" : ""}" data-ansec="${key}">
+    <button class="an-sec-h" data-ancollapse="${key}"><span class="an-sec-t">${title}</span><span class="an-chev">▾</span></button>
+    <div class="an-sec-b">${bodyHtml}</div>
+  </div>`;
+}
+function toggleAnSection(key) {
+  const sec = document.querySelector(`.an-sec[data-ansec="${key}"]`);
+  if (!sec) return;
+  AN_COLLAPSED[key] = sec.classList.toggle("collapsed");
+  save(LS.anCollapsed, AN_COLLAPSED);
+}
+function toggleRepRank(r) {
+  const row = document.querySelector(`.an-forza [data-repexpand="${r}"]`);
+  const box = document.querySelector(`.an-forza .rep-rank[data-reprank="${r}"]`);
+  if (row) row.classList.toggle("open");
+  if (box) box.hidden = !box.hidden;
+}
 function applyDisguise() {
   document.body.classList.toggle("discreet", DISCREET);
   document.body.classList.toggle("showtabs", SHOWTABS);
@@ -823,9 +847,151 @@ function forzaBadge(ratio) {
   return { cls: "media", txt: "➖ Nella media" };
 }
 
+function seasonalTitle() { return `📊 Rosa stagionale — statistiche${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}`; }
+
+// Riepilogo statistiche STAGIONALI della propria rosa, per reparto (P/D/C/A).
+// Dati: giornata.json→stats (base, chiave fantaId) + giornata.json→detail (RICCHE, solo
+// mia rosa: titolare/subentro, split gol casa/trasferta, autogol, rigori, cartellini).
+// Ritorna il SOLO corpo (il titolo lo mette la sezione comprimibile che lo avvolge).
+function seasonalRosaBlock() {
+  const roster = activeRoster();
+  if (!roster.length) return `<div class="an-note">La tua rosa è ancora vuota.</div>`;
+  const g = giornataActive();
+  const n1 = (x) => (typeof x === "number" ? x : +x || 0);
+  // unisce base (stats) + ricche (detail); pg/mv/fm dalla base per coerenza col resto dell'app
+  const rowOf = (p) => {
+    const k = String(p.fantaId ?? p.id);
+    const st = (g && g.stats ? g.stats[k] : null) || null;
+    const dt = (g && g.detail ? g.detail[k] : null) || null;
+    const pg = st ? n1(st.pg) : (dt ? n1(dt.pgv) : 0);
+    return { p, st, dt, pg, mv: st ? n1(st.mv) : (dt ? n1(dt.mv) : 0), fm: st ? n1(st.mfv) : (dt ? n1(dt.fm) : 0) };
+  };
+  const played = roster.map(rowOf).filter((x) => x.pg > 0);
+  if (!played.length) {
+    return `<div class="an-note">Nessuna presenza registrata: le statistiche compaiono a campionato avviato (aggiornate in automatico). Per provare la vista ora, apri l'app con <code>?fdemo=1</code>.</div>`;
+  }
+  const hasDetail = played.some((x) => x.dt);
+  // stile uniforme: numero in GRASSETTO e PRIMA della descrizione/icona
+  const b = (v) => `<b>${v}</b>`;
+  const pill = (ic, v, cls) => v ? `<span class="stat-pill${cls ? " " + cls : ""}">${b(v)} ${ic}</span>` : "";
+  const ha = (c, t) => (c || t) ? `<span class="ha">${b(c)}🏠 ${b(t)}✈️</span>` : "";
+
+  const reparti = ROLES.map((r) => {
+    const showGs = r === "P" || r === "D";
+    const list = roster.map(rowOf).filter((x) => x.pg > 0 && x.p.ruolo === r).sort((a, b) => b.fm - a.fm);
+    if (!list.length) return "";
+    // aggregati reparto: MV/FM pesate sulle presenze; somme dei bonus
+    const sumPg = list.reduce((s, x) => s + x.pg, 0) || 1;
+    const wMv = list.reduce((s, x) => s + x.mv * x.pg, 0) / sumPg;
+    const wFm = list.reduce((s, x) => s + x.fm * x.pg, 0) / sumPg;
+    const sum = (f) => list.reduce((s, x) => s + f(x), 0);
+    const gol = sum((x) => x.dt ? n1(x.dt.gol) : (x.st ? n1(x.st.gol) : 0));
+    const ass = sum((x) => x.dt ? n1(x.dt.ass) : (x.st ? n1(x.st.ass) : 0));
+    const gs = sum((x) => x.dt ? n1(x.dt.gs) : (x.st ? n1(x.st.gs) : 0));
+    const agg = `${b(wMv.toFixed(2))} MV · ${b(wFm.toFixed(2))} FM${gol ? ` · ${b(gol)}⚽` : ""}${ass ? ` · ${b(ass)}🅰` : ""}${showGs && gs ? ` · ${b(gs)}🥅` : ""}`;
+
+    const rows = list.map(({ p, st, dt, pg, mv, fm }) => {
+      const gol = dt ? n1(dt.gol) : (st ? n1(st.gol) : 0);
+      const ass = dt ? n1(dt.ass) : (st ? n1(st.ass) : 0);
+      const gsv = dt ? n1(dt.gs) : (st ? n1(st.gs) : 0);
+      // riga presenze: titolare/subentro/uscito + clean sheet (portiere, split casa/tras)
+      const mt = dt && dt.match;
+      const cs = mt ? n1(mt.csHome) + n1(mt.csAway) : 0;
+      // split assist casa/trasferta dal match-scrape: mostrato solo se combacia col totale canonico
+      const assH = mt ? n1(mt.assHome) : 0, assA = mt ? n1(mt.assAway) : 0;
+      const assSplit = ass > 0 && (assH + assA) === ass;
+      const presTxt = dt
+        ? `${b(pg)} pres · ${b(n1(dt.tit))} da titolare${dt.sub ? ` · ${b(n1(dt.sub))} subentro` : ""}`
+          + `${mt && n1(mt.subOff) ? ` · ${b(n1(mt.subOff))} uscito` : ""}`
+          + `${r === "P" && mt ? ` · ${b(cs)} clean sheet${cs ? ha(n1(mt.csHome), n1(mt.csAway)) : ""}` : ""}`
+        : `${b(pg)} pres`;
+      // pills: gol (+split casa/tras), assist, gs portiere (+split), rigori, parati, autogol, cartellini
+      const pills = [
+        gol ? `<span class="stat-pill good">${b(gol)} ⚽${dt ? ha(n1(dt.golCasa), n1(dt.golTras)) : ""}</span>` : "",
+        ass ? `<span class="stat-pill">${b(ass)} 🅰${assSplit ? ha(assH, assA) : ""}</span>` : "",
+        showGs && gsv ? `<span class="stat-pill bad">${b(gsv)} 🥅${dt ? ha(n1(dt.gsCasa), n1(dt.gsTras)) : ""}</span>` : "",
+        dt && n1(dt.rp) ? pill("🧤", n1(dt.rp), "good") : "",
+        dt && n1(dt.rigTot) ? pill("🎯", `${n1(dt.rigSeg)}/${n1(dt.rigTot)}`) : "",
+        dt && n1(dt.autogol) ? pill("🔴AG", n1(dt.autogol), "bad") : "",
+        dt && n1(dt.amm) ? pill("🟨", n1(dt.amm)) : "",
+        dt && n1(dt.esp) ? pill("🟥", n1(dt.esp), "bad") : "",
+      ].join("");
+      return `<div class="st-card">
+        <div class="st-head"><span class="rp ${r}">${r}</span><span class="st-name">${esc(shortName(p.nome))} <span class="st-team">(${esc(p.squadra)})</span></span>
+          <span class="st-mvfm">${b(mv.toFixed(2))} MV · ${b(fm.toFixed(2))} FM</span></div>
+        <div class="st-line">${presTxt}</div>
+        ${pills ? `<div class="st-pills">${pills}</div>` : ""}
+      </div>`;
+    }).join("");
+    return `<div class="an-statrep">
+      <div class="rep-title"><span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]} <span class="meta">· ${agg}</span></div>
+      <div class="an-block">${rows}</div>
+    </div>`;
+  }).join("");
+
+  const legenda = hasDetail
+    ? `<div class="an-hint-sm">🏠 casa · ✈️ trasferta · 🎯 rigori segnati/tirati · 🧤 rigori parati · 🔴AG autogol · <b>uscito</b> = sostituito a gara in corso · <b>clean sheet</b> = porta inviolata (portiere titolare). Statistiche ricche solo per la tua rosa.</div>`
+    : `<div class="an-hint-sm">Statistiche di base (le statistiche ricche — titolare/subentro, split casa/trasferta — si vedono con i dati reali della tua rosa).</div>`;
+  return reparti + legenda;
+}
+
+// Sezione "Acquisti per club": menu a tendina per scegliere la squadra di lega
+// (default = la mia), breakdown per club di Serie A + lista dei club a zero acquisti.
+const AN_CLUB_ALL = "__ALL__"; // voce "Tutti i giocatori" (sommatoria su tutta la lega)
+function clubSectionBody() {
+  const teams = teamList();
+  const me = teams.find((t) => t.isMe) || teams[0] || { id: MY_TEAM, name: "—" };
+  const valid = (anClubTeam === AN_CLUB_ALL) || teams.some((t) => t.id === anClubTeam);
+  const selId = (anClubTeam && valid) ? anClubTeam : me.id;
+  const isAll = selId === AN_CLUB_ALL;
+  const opts = `<option value="${AN_CLUB_ALL}"${isAll ? " selected" : ""}>Tutti i giocatori (lega)</option>`
+    + teams.map((t) => `<option value="${esc(t.id)}"${t.id === selId ? " selected" : ""}>${esc(t.name)}${t.isMe ? " (io)" : ""}</option>`).join("");
+  const picker = `<div class="an-club-pick"><label>Squadra</label><select data-anclub>${opts}</select></div>`;
+
+  const src = isAll ? PURCHASES : PURCHASES.filter((pu) => pu.team === selId);
+  const clubMap = {};
+  src.forEach((pu) => {
+    const pl = PLAYERS.find((x) => x.id === pu.playerId) || {};
+    const club = pl.squadra || pu.squadra || "?";
+    const ruolo = pl.ruolo || pu.ruolo || "?";
+    const c = clubMap[club] || (clubMap[club] = { n: 0, players: [], tally: { P: 0, D: 0, C: 0, A: 0 } });
+    c.n += 1; c.players.push({ nome: pl.nome || pu.nome || pu.playerId, ruolo });
+    if (c.tally[ruolo] != null) c.tally[ruolo] += 1;
+  });
+  const maxClub = Math.max(1, ...Object.values(clubMap).map((c) => c.n));
+  const clubRows = Object.entries(clubMap)
+    .sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]))
+    .map(([club, c]) => {
+      // "Tutti": totale per ruolo (evita 250 nomi); singola squadra: i nomi dei giocatori
+      const body = isAll
+        ? ROLES.filter((r) => c.tally[r]).map((r) => `<span class="club-chip"><span class="rp ${r} xs">${r}</span>${c.tally[r]}</span>`).join("")
+        : c.players.sort((a, b) => ROLES.indexOf(a.ruolo) - ROLES.indexOf(b.ruolo))
+            .map((p) => `<span class="club-chip"><span class="rp ${p.ruolo} xs">${p.ruolo}</span>${esc(shortName(p.nome))}</span>`).join("");
+      return `<div class="an-row club-row">
+        <div class="grow">
+          <div class="club-hd"><b>${esc(club)}</b> <span class="club-cnt">${c.n}</span>
+            <div class="an-bar club-bar"><i style="width:${(c.n / maxClub) * 100}%"></i></div></div>
+          <div class="club-pls">${body}</div>
+        </div>
+      </div>`;
+    }).join("");
+  // tutti i club di Serie A dal listone → quelli senza alcun acquisto della selezione
+  const allClubs = [...new Set(PLAYERS.map((p) => p.squadra).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const zero = allClubs.filter((c) => !(c in clubMap));
+  const zeroHtml = `<div class="an-zero"><div class="an-zero-t">Club senza acquisti${zero.length ? ` (${zero.length})` : ""}</div>${
+    zero.length ? `<div class="an-zero-l">${zero.map((c) => `<span class="zero-chip">${esc(c)}</span>`).join("")}</div>`
+                : `<div class="an-hint-sm">Almeno un giocatore da ogni club di Serie A.</div>`
+  }</div>`;
+  const hint = `<div class="an-hint-sm">${isAll ? `${src.length} giocatori assegnati · ` : ""}${Object.keys(clubMap).length}/${allClubs.length} club rappresentati.</div>`;
+  return picker + `<div class="an-block">${clubRows || `<div class="an-row"><span class="meta">Nessun acquisto per questa squadra.</span></div>`}</div>` + hint + zeroHtml;
+}
+
 function renderAnalisi() {
   const el = document.getElementById("analisiBody");
+  ensureDemoIfRequested();
   if (!PURCHASES.length) {
+    // in demo (?fdemo=1) mostro comunque la rosa stagionale (rosa+stat sintetiche in memoria)
+    if (formDemo) { el.innerHTML = anSection("stagionale", seasonalTitle(), seasonalRosaBlock()); return; }
     el.innerHTML = `<div class="called empty" style="margin-top:24px">Nessun acquisto registrato.<br>L'analisi comparirà man mano che assegni i giocatori nell'Asta.</div>`;
     return;
   }
@@ -876,19 +1042,26 @@ function renderAnalisi() {
     </div>`;
   }).join("");
 
-  // --- C. Forza per reparto vs lega ---
+  // --- C. Forza per reparto vs lega (ogni reparto si apre sulla classifica di lega) ---
   const forzaRep = ROLES.map((r) => {
     const ratio = avgRole[r] > 0 ? me.valueByRole[r] / avgRole[r] : 1;
     const b = forzaBadge(ratio);
     const w = (me.valueByRole[r] / maxRole[r]) * 100;
     const avgW = (avgRole[r] / maxRole[r]) * 100;
-    return `<div class="an-row">
+    const rank = [...stats].sort((a, s) => s.valueByRole[r] - a.valueByRole[r]);
+    const rankHtml = rank.map((s, i) => `<div class="rr ${s.id === me.id ? "an-me" : ""}">
+        <span class="an-pos">${i + 1}</span><span class="rr-n">${esc(s.name)}</span>
+        <div class="an-bar rr-bar"><i class="fill-${r}" style="width:${Math.min(100, (s.valueByRole[r] / maxRole[r]) * 100)}%"></i></div>
+        <span class="rr-v">${s.valueByRole[r]}</span></div>`).join("");
+    return `<div class="an-row rep-head" data-repexpand="${r}">
       <span class="rp ${r}">${r}</span>
       <div class="grow">
         <div class="an-line"><span class="badge ${b.cls}">${b.txt}</span> #${roleRank[r]}/${N} · tu <b>${me.valueByRole[r]}</b> · media ${Math.round(avgRole[r])}</div>
         <div class="an-bar"><i class="fill-${r}" style="width:${Math.min(100, w)}%"></i><span class="tick" style="left:${Math.min(100, avgW)}%"></span></div>
       </div>
-    </div>`;
+      <span class="an-chev sm">▾</span>
+    </div>
+    <div class="rep-rank" data-reprank="${r}" hidden>${rankHtml}</div>`;
   }).join("");
 
   // --- D. Classifica squadre (forza) ---
@@ -925,19 +1098,14 @@ function renderAnalisi() {
 
   el.innerHTML = `
     ${nota}
-    <div class="section-title">Riepilogo — ${esc(me.name)}</div>
-    ${riepilogo}
-    <div class="section-title">Spesa per reparto</div>
-    <div class="an-block">${spesaRep}</div>
-    <div class="section-title">Forza per reparto (vs media lega)</div>
-    <div class="an-block">${forzaRep}</div>
-    <div class="section-title">Classifica squadre per forza rosa</div>
-    <div class="list">${classifica}</div>
-    <div class="section-title">💚 I tuoi affari</div>
-    <div class="list">${affariHtml}</div>
-    <div class="section-title">💸 I tuoi salassi</div>
-    <div class="list">${salassiHtml}</div>
-    <div class="an-note" style="margin-top:12px">Saldo: ${nettoTxt}.</div>`;
+    ${anSection("riepilogo", `Riepilogo — ${esc(me.name)}`, riepilogo)}
+    ${anSection("spesa", "Spesa per reparto", `<div class="an-block">${spesaRep}</div>`)}
+    ${anSection("forza", "Forza per reparto (vs media lega)", `<div class="an-block an-forza">${forzaRep}</div><div class="an-hint-sm">Tocca un reparto per aprire la classifica di lega.</div>`)}
+    ${anSection("club", "Acquisti per club di Serie A", clubSectionBody())}
+    ${anSection("classifica", "Classifica squadre per forza rosa", `<div class="list">${classifica}</div>`)}
+    ${anSection("affari", "💚 I tuoi affari", `<div class="list">${affariHtml}</div>`)}
+    ${anSection("salassi", "💸 I tuoi salassi", `<div class="list">${salassiHtml}</div><div class="an-note" style="margin-top:12px">Saldo: ${nettoTxt}.</div>`)}
+    ${anSection("stagionale", seasonalTitle(), seasonalRosaBlock())}`;
 }
 
 // ---- IMPOSTAZIONI ----
@@ -1191,6 +1359,20 @@ const _deac = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").to
 const shortName = (n) => { const t = String(n || "").trim().split(/\s+/); return t.length > 1 ? t.slice(0, -1).join(" ") : (n || ""); };
 
 function giornataActive() { return formDemo ? formDemo.g : GIORNATA; }
+const RUOLI_NOME = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
+
+// attiva la demo se richiesta via URL (?fdemo=1); usata da Formazione e da Analisi (rosa stagionale)
+function ensureDemoIfRequested() {
+  if (!formDemo && /[?&]fdemo\b/.test(location.search) && PLAYERS.length) formDemo = buildFormDemo();
+}
+// rosa attiva: demo (se presente) oppure la mia rosa reale (acquisti della mia squadra)
+function activeRoster() {
+  if (formDemo) return formDemo.roster;
+  return PURCHASES.filter((pu) => pu.team === MY_TEAM).map((pu) => {
+    const pl = PLAYERS.find((x) => x.id === pu.playerId) || { id: pu.playerId, nome: pu.nome || pu.playerId, ruolo: pu.ruolo || "C", squadra: pu.squadra || "?" };
+    return { id: pl.id, fantaId: pl.fantaId, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
+  });
+}
 
 // resa attesa: fantamedia (se ci sono partite) o media di ruolo, moderata dalla disponibilità
 function expScore(st, prob, injured) {
@@ -1234,15 +1416,9 @@ function bestXI(players) {
 function renderFormazione() {
   const el = document.getElementById("formazioneBody");
   // demo raggiungibile solo via URL ?fdemo=1 (backdoor per rifiniture; nessun pulsante visibile)
-  if (!formDemo && /[?&]fdemo\b/.test(location.search) && PLAYERS.length) formDemo = buildFormDemo();
+  ensureDemoIfRequested();
   const g = giornataActive();
-  // rosa attiva: demo oppure la mia rosa reale (acquisti della mia squadra)
-  let roster;
-  if (formDemo) roster = formDemo.roster;
-  else roster = PURCHASES.filter((pu) => pu.team === MY_TEAM).map((pu) => {
-    const pl = PLAYERS.find((x) => x.id === pu.playerId) || { id: pu.playerId, nome: pu.nome || pu.playerId, ruolo: pu.ruolo || "C", squadra: pu.squadra || "?" };
-    return { id: pl.id, fantaId: pl.fantaId, nome: pl.nome, ruolo: pl.ruolo, squadra: pl.squadra, infortunato: !!pl.infortunato, rientro: pl.rientro };
-  });
+  const roster = activeRoster();
 
   // in uso normale nessun pulsante demo; se la demo è attiva (via URL) mostro solo l'uscita
   const demoBtn = formDemo ? `<button class="btn ghost on" data-formdemo="1">🧪 Esci dalla demo</button>` : "";
@@ -1289,7 +1465,6 @@ function renderFormazione() {
   }
 
   const ord = { go: 0, maybe: 1, no: 2 };
-  const RUOLI_NOME = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
   const reparti = ROLES.map((r) => {
     const list = roster.filter((p) => p.ruolo === r).sort((a, b) => ord[a._lab.k] - ord[b._lab.k] || b._exp - a._exp);
     if (!list.length) return "";
@@ -1413,6 +1588,12 @@ function wire() {
   // manopola manuale (aggiustamento ±% e nota) per giocatore
   document.body.addEventListener("change", (e) => {
     const t = e.target; if (!t || !t.dataset) return;
+    if (t.dataset.anclub != null) {
+      anClubTeam = t.value;
+      const body = document.querySelector('.an-sec[data-ansec="club"] .an-sec-b');
+      if (body) body.innerHTML = clubSectionBody();
+      return;
+    }
     if (t.dataset.adjust != null) {
       const pid = t.dataset.adjust, v = Number(t.value) || 0;
       CONFIG.adjust = CONFIG.adjust || {};
@@ -1441,6 +1622,11 @@ function wire() {
     if (remP) { undoPurchaseByPlayer(remP.dataset.removePurchase); return; }
     const fav = e.target.closest("[data-fav]");
     if (fav) { e.stopPropagation(); toggleFav(fav.dataset.fav); return; }
+    // Analisi: comprimi/espandi sezione + classifica reparto (senza re-render, solo DOM)
+    const anh = e.target.closest("[data-ancollapse]");
+    if (anh) { toggleAnSection(anh.dataset.ancollapse); return; }
+    const rex = e.target.closest("[data-repexpand]");
+    if (rex) { toggleRepRank(rex.dataset.repexpand); return; }
     // doppio-tap per espandere le info del singolo (solo in modalità discreta)
     if (document.body.classList.contains("discreet")) {
       // ASTA: doppio-tap sul NOME (finestra 400ms; se sbagli non succede nulla di indesiderato)

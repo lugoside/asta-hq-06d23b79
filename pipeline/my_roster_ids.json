@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "descr": "fantaId della MIA rosa (slot __ME__ / Valerio) per lo scrape mirato delle statistiche ricche (pagina-giocatore fantacalcio.it). Da aggiornare a mano al mercato di riparazione.",
+    "aggiornato": "2026-09-04",
+    "count": 25
+  },
+  "roster": [
+    { "fantaId": "4236", "nome": "Muric Arijanet", "ruolo": "P", "squadra": "Sassuolo" },
+    { "fantaId": "6662", "nome": "Corvi Edoardo", "ruolo": "P", "squadra": "Parma" },
+    { "fantaId": "7411", "nome": "Daffara Giovanni", "ruolo": "P", "squadra": "Parma" },
+    { "fantaId": "5862", "nome": "Valeri Emanuele", "ruolo": "D", "squadra": "Parma" },
+    { "fantaId": "5526", "nome": "Scalvini Giorgio", "ruolo": "D", "squadra": "Atalanta" },
+    { "fantaId": "2788", "nome": "Bremer Gleison", "ruolo": "D", "squadra": "Juventus" },
+    { "fantaId": "5750", "nome": "Ostigard Leo", "ruolo": "D", "squadra": "Genoa" },
+    { "fantaId": "2296", "nome": "Mancini Gianluca", "ruolo": "D", "squadra": "Roma" },
+    { "fantaId": "4137", "nome": "Diego Carlos Santos Silva", "ruolo": "D", "squadra": "Parma" },
+    { "fantaId": "6990", "nome": "Veiga Danilo de Melo", "ruolo": "D", "squadra": "Lecce" },
+    { "fantaId": "7469", "nome": "Bracaglia Gabriele", "ruolo": "D", "squadra": "Frosinone" },
+    { "fantaId": "2606", "nome": "Modric Luka", "ruolo": "C", "squadra": "Milan" },
+    { "fantaId": "2194", "nome": "Calhanoglu Hakan", "ruolo": "C", "squadra": "Inter" },
+    { "fantaId": "5823", "nome": "Baldanzi Tommaso", "ruolo": "C", "squadra": "Genoa" },
+    { "fantaId": "5559", "nome": "Da Cunha Lucas", "ruolo": "C", "squadra": "Como" },
+    { "fantaId": "6151", "nome": "Perrone Maximo", "ruolo": "C", "squadra": "Como" },
+    { "fantaId": "7223", "nome": "Vergara Antonio", "ruolo": "C", "squadra": "Napoli" },
+    { "fantaId": "7472", "nome": "Calo Giacomo", "ruolo": "C", "squadra": "Frosinone" },
+    { "fantaId": "6010", "nome": "Fazzini Jacopo", "ruolo": "C", "squadra": "Cagliari" },
+    { "fantaId": "2137", "nome": "Scamacca Gianluca", "ruolo": "A", "squadra": "Atalanta" },
+    { "fantaId": "5951", "nome": "Kolo Muani Randal", "ruolo": "A", "squadra": "Juventus" },
+    { "fantaId": "4923", "nome": "Colombo Lorenzo", "ruolo": "A", "squadra": "Genoa" },
+    { "fantaId": "6229", "nome": "Toure El Bilal", "ruolo": "A", "squadra": "Parma" },
+    { "fantaId": "5637", "nome": "Davis Keinan", "ruolo": "A", "squadra": "Udinese" },
+    { "fantaId": "4896", "nome": "Maldini Daniel", "ruolo": "A", "squadra": "Cagliari" }
+  ]
+}

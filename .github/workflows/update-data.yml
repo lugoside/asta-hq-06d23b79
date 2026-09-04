@@ -63,12 +63,16 @@ jobs:
         run: python pipeline/build_players.py
       - name: Dati di giornata (statistiche + probabili + fixtures)
         run: python pipeline/fetch_giornata.py || echo "giornata non aggiornata (fonte non disponibile), proseguo"
+      - name: Statistiche ricche della mia rosa (scrape mirato ~25 pagine-giocatore)
+        run: python pipeline/fetch_roster_stats.py || echo "detail rosa non aggiornato (fonte non disponibile), proseguo"
+      - name: Dati match-by-match della mia rosa (uscite, clean sheet, casa/trasferta)
+        run: python pipeline/fetch_matches.py || echo "match rosa non aggiornati (fonte non disponibile), proseguo"
       - name: Commit e pubblica (robusto ai race)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json
+            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json pipeline/matches_cache.json
             if git diff --cached --quiet; then
               echo "Nessuna variazione nei dati."; exit 0
             fi
