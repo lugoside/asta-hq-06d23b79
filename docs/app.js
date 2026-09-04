@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v74"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v75"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -349,6 +349,12 @@ async function reconcileSync() {
     const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
     const remoteEmpty = !rm || (typeof rm === "object" && !Object.keys(rm).length);
     if (remoteEmpty && !MOVES.length) await seedMovesFromLegacy();
+    // AUTO-GUARIGIONE: mosse locali su vecchi NOMI ma config già su slot (cache pre-migrazione) →
+    // azzera e ripopola dal cloud (già slot-keyed). Evita rose orfane dopo un rinomina.
+    if (rm && !remoteEmpty && Array.isArray(CONFIG.teams) && CONFIG.teams.length &&
+        CONFIG.teams.every((t) => SLOT_RE.test(t)) && MOVES.some((m) => m && m.team && !SLOT_RE.test(m.team))) {
+      MOVES = []; saveMoves();
+    }
     if (rm) mergeCloudMoves(rm);
     await flushPending();
     recompute(); renderAll(); setSyncStatus("ok");
