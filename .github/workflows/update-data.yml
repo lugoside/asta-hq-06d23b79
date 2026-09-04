@@ -9,20 +9,19 @@ name: update-data
 # Tutto scrapabile senza credenziali. NB: i CEDUTI restano l'unico dato manuale (Excel login-gated
 # -> pipeline/ceduti_ids.json). I "fuori lista" ancora quotati vengono esclusi da quella lista.
 # - workflow_dispatch: avviabile A MANO, anche da telefono (GitHub app/web → Run workflow)
-# - schedule: ogni mattina, utile nei giorni prima dell'asta
+# - schedule: ogni notte, ma il job "gate" aggiorna SOLO la notte dopo la fine di una giornata
 on:
   # push incluso solo per NON generare run-fantasma "failed / No jobs were run":
   # sul push il job viene saltato (if sotto) → run "skipped", nessuna mail di fallimento.
   push:
   workflow_dispatch:
   schedule:
-    # NB: gli orari cron di GitHub sono in UTC. A ago/set l'Italia è UTC+2 (CEST).
-    # Fino al 31/08: una volta al mattino, ~08:00 IT (06:00 UTC), ogni giorno di agosto.
-    - cron: "0 6 * 8 *"
-    # 1–2 settembre: 06:00/10:00/14:00/18:00/20:00 IT -> 04/08/12/16/18 UTC
-    - cron: "0 4,8,12,16,18 1,2 9 *"
-    # 3 settembre (giorno d'asta): 06:00/10:00/14:00/18:00 IT -> 04/08/12/16 UTC (ultimo alle 18:00 IT)
-    - cron: "0 4,8,12,16 3 9 *"
+    # STAGIONE: ogni notte alle 00:00 UTC (~02:00 IT in estate / 01:00 in inverno).
+    # Il job "gate" fa girare l'aggiornamento SOLO la notte dopo l'ultima partita di una
+    # giornata di Serie A (ieri partite, oggi no); le altre notti esce subito.
+    # NB: il cron di GitHub è best-effort (può ritardare di ore). Per un giro immediato:
+    # avvio manuale (Setup → ⚡ o "Run workflow"), che salta il gate ed esegue sempre.
+    - cron: "0 0 * * *"
 
 permissions:
   contents: write
@@ -36,9 +35,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Push senza aggiornamento dati (il workflow gira solo su schedule o avvio manuale)."
-  update:
-    # l'aggiornamento vero NON gira sul push: solo schedule / workflow_dispatch
+  # GATE: decide se stanotte serve aggiornare (giorno dopo l'ultima partita di una giornata).
+  # Sul workflow_dispatch (avvio manuale) forza sempre l'esecuzione.
+  gate:
     if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: check
+        name: Aggiorna solo il giorno dopo la fine di una giornata (o su avvio manuale)
+        env:
+          FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: python pipeline/should_update.py
+  update:
+    # l'aggiornamento vero NON gira sul push; sullo schedule solo se il gate lo consente
+    needs: gate
+    if: github.event_name != 'push' && needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
