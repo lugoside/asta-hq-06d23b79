@@ -24,7 +24,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v73"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v74"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -40,37 +40,72 @@ const defaultConfig = () => ({
   splitPct: { P: 8, D: 14, C: 28, A: 50 },
   concentration: DEFAULT_CONFIG.concentration,
   strappo: DEFAULT_CONFIG.strappo,
-  // teams = elenco COMPLETO dei nomi squadra (config di LEGA, condivisa/admin).
-  // myTeam = quale squadra sono IO (scelta LOCALE, non condivisa).
-  teams: ["IO", ...Array.from({ length: 9 }, (_, i) => `Avv ${i + 1}`)],
-  myTeam: "IO",
+  // teams = elenco degli ID STABILI slotN (identità di LEGA condivisa, immutabili col rinomina).
+  // aliases = { slotN: nome visualizzato } (rinominabile, condiviso). myTeam = quale slot sono IO (LOCALE).
+  teams: Array.from({ length: 10 }, (_, i) => `slot${i + 1}`),
+  aliases: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`slot${i + 1}`, i === 0 ? "IO" : `Avv ${i}`])),
+  myTeam: "slot1",
   auctionOpen: true, // asta aperta/chiusa (config di LEGA): quando chiusa, nessuno modifica le rose
   resetAt: 0,        // marcatore reset di lega: quando cresce, ogni dispositivo azzera le mosse locali
   adjust: {}, // aggiustamento manuale del valore per giocatore: { playerId: percentuale }
   notes: {},  // note manuali per giocatore: { playerId: "testo" }
 });
 
-// Normalizza la config: migra il vecchio modello (myName+opponents) al nuovo
-// (teams[]+myTeam), mantiene numTeams coerente con teams.length e myTeam valido.
+// slot ID stabili: identità immutabile della squadra (il nome è solo un alias).
+const SLOT_RE = /^slot\d+$/;
+
+// Normalizza la config e MIGRA i vecchi formati:
+//  1) vecchissimo {myName,opponents} -> teams[] nomi
+//  2) teams=NOMI -> teams=slotN + aliases{slot:nome}  (il refactor ID stabile)
+// Mantiene numTeams coerente, aliases una entry per slot, myTeam = uno slot valido.
 function normalizeConfig(c) {
   c = c || {};
-  if (!Array.isArray(c.teams)) {                       // migrazione dal vecchio schema
+  if (!Array.isArray(c.teams)) {                       // (1) vecchissimo schema
     const me = c.myName || "IO";
     const opp = Array.isArray(c.opponents) ? c.opponents : [];
     c.teams = [me, ...opp];
     if (!c.myTeam) c.myTeam = me;
   }
+  // (2) migrazione NOMI -> slotN + aliases (se i teams non sono già tutti slot, o manca aliases)
+  const teamsAreSlots = c.teams.length > 0 && c.teams.every((t) => SLOT_RE.test(t));
+  if (!teamsAreSlots || !c.aliases || typeof c.aliases !== "object") {
+    const aliases = {}, slots = [];
+    c.teams.forEach((v, i) => {
+      const slot = SLOT_RE.test(v) ? v : `slot${i + 1}`;
+      slots.push(slot);
+      aliases[slot] = teamsAreSlots ? ((c.aliases && c.aliases[slot]) ?? slot) : String(v);
+    });
+    if (c.myTeam != null && !SLOT_RE.test(c.myTeam)) {         // myTeam era un nome -> slot per posizione
+      const idx = c.teams.indexOf(c.myTeam);
+      c.myTeam = idx >= 0 ? slots[idx] : slots[0];
+    }
+    c.teams = slots; c.aliases = aliases;
+  }
   const n = Math.max(2, Math.round(c.numTeams || c.teams.length || 10));
-  if (c.teams.length !== n) {                           // allinea la lista al numero squadre
+  if (c.teams.length !== n) {                           // allinea al numero squadre (nuovi slot, mai riusati)
     c.teams = c.teams.slice(0, n);
-    while (c.teams.length < n) c.teams.push(`Avv ${c.teams.length}`);
+    while (c.teams.length < n) c.teams.push(`slot${c.teams.length + 1}`);
   }
   c.numTeams = c.teams.length;
-  if (!c.myTeam || !c.teams.includes(c.myTeam)) c.myTeam = c.teams[0]; // "io" deve esistere
-  if (typeof c.auctionOpen !== "boolean") c.auctionOpen = true;        // default: asta aperta
+  c.aliases = c.aliases || {};
+  c.teams.forEach((s, i) => { if (!(s in c.aliases)) c.aliases[s] = i === 0 ? "IO" : `Avv ${i}`; });
+  if (!c.myTeam || !c.teams.includes(c.myTeam)) c.myTeam = c.teams[0];  // "io" = uno slot esistente
+  if (typeof c.auctionOpen !== "boolean") c.auctionOpen = true;
   if (typeof c.resetAt !== "number") c.resetAt = 0;
-  delete c.myName; delete c.opponents;                 // via i campi obsoleti
+  delete c.myName; delete c.opponents;
   return c;
+}
+// Alias visualizzato di uno slot (o dello slot "me").
+function alias(slot) { return (CONFIG.aliases && CONFIG.aliases[slot]) || slot; }
+// Rinomine STORICHE avvenute in asta (nomi non più negli alias correnti): "Mino" era "Ale" = slot5.
+// Servono a mappare a slot le mosse orfane rimaste sotto il vecchio nome (nel nostro caso già superate
+// da reduceMoves, quindi innocue per le rose: le mappiamo solo per una migrazione pulita).
+const STORIA_RENAME = { "Mino": "slot5" };
+// Mappa un valore team (slot o vecchio NOME) allo slot: tolleranza durante la migrazione delle mosse.
+function toSlot(v) {
+  if (v == null || SLOT_RE.test(v)) return v;
+  const t = (CONFIG.teams || []).find((s) => alias(s) === v);
+  return t || STORIA_RENAME[v] || v;
 }
 
 let CONFIG = normalizeConfig(load(LS.config, defaultConfig()));
@@ -106,7 +141,7 @@ const _inflight = new Set(); // uid delle mosse in invio (in MEMORIA, non persis
 
 // Config di LEGA condivisa via cloud (/config): regole valide per tutti + elenco squadre.
 // Personali (NON condivisi, restano locali): splitPct, concentration, strappo, adjust, notes.
-const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams", "auctionOpen", "resetAt"];
+const SHARED_CONFIG_KEYS = ["numTeams", "budgetPerTeam", "roster", "teams", "aliases", "auctionOpen", "resetAt"];
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -154,7 +189,7 @@ async function deleteCloudMoves() {
 }
 // ricostruisce PURCHASES dal log di mosse; i team condivisi tornano id locali (MY_TEAM per me)
 function rebuildPurchases() {
-  PURCHASES = reduceMoves(MOVES).map((p) => ({ ...p, team: sharedTeamToLocal(p.team) }));
+  PURCHASES = reduceMoves(MOVES).map((p) => ({ ...p, team: sharedTeamToLocal(toSlot(p.team)) }));
   save(LS.purchases, PURCHASES); // cache di comodità (backup/export continuano a leggerla)
 }
 // porta lo stato acquisti verso `target` (lista in forma locale) emettendo mosse compensative.
@@ -301,9 +336,13 @@ async function reconcileSync() {
     const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json();
     if (rc && typeof rc === "object") {
       if (adoptConfig(rc)) { recompute(); renderAll(); }
-      // se il cloud ha una config di vecchio formato (senza teams[]), la aggiorno al nuovo
-      // schema così la LITE legge l'elenco squadre senza interventi manuali.
-      if ((!Array.isArray(rc.teams) || rc.auctionOpen === undefined) && Array.isArray(CONFIG.teams) && CONFIG.teams.length) await pushConfig();
+      // se il cloud è in VECCHIO formato (teams=nomi, o senza aliases), pubblico la config MIGRATA
+      // (slot stabili + aliases) e riscrivo le mosse nome→slot una-tantum (sicurezza sul rinomina).
+      const remoteOldFmt = !Array.isArray(rc.teams) || rc.auctionOpen === undefined || !rc.aliases || !rc.teams.every((t) => SLOT_RE.test(t));
+      if (remoteOldFmt && Array.isArray(CONFIG.teams) && CONFIG.teams.length && CONFIG.teams.every((t) => SLOT_RE.test(t))) {
+        await pushConfig();
+        await migrateCloudMovesToSlots();
+      }
     } else if (haveLocalConfig()) await pushConfig();
 
     // 2) mosse: se il log remoto è vuoto e non ho ancora mosse locali, migro dai vecchi acquisti.
@@ -314,6 +353,23 @@ async function reconcileSync() {
     await flushPending();
     recompute(); renderAll(); setSyncStatus("ok");
   } catch { setSyncStatus("err"); }
+}
+// migrazione una-tantum: riscrive nel cloud il campo `team` delle mosse da NOME → slot ID
+// (usa toSlot = reverse degli alias). Idempotente: salta le mosse già su slot.
+async function migrateCloudMovesToSlots() {
+  const mu = movesUrl(); if (!SYNC.on || !mu) return;
+  try {
+    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    if (!rm || typeof rm !== "object") return;
+    const daFare = Object.entries(rm).filter(([, m]) => m && m.team != null && !SLOT_RE.test(m.team));
+    for (const [pushId, m] of daFare) {
+      const slot = toSlot(m.team);
+      if (SLOT_RE.test(slot)) {
+        await fetch(`${mu}/${encodeURIComponent(pushId)}/team.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slot) });
+      }
+    }
+    if (daFare.length) { const rm2 = await (await fetch(mu + ".json", { cache: "no-store" })).json(); if (rm2) { mergeCloudMoves(rm2); rebuildPurchases(); } }
+  } catch {}
 }
 // migrazione una-tantum: acquisti del vecchio modello → mosse `buy`.
 // sorgente: acquisti locali; in mancanza, il vecchio nodo condiviso leghe/<code>/purchases.
@@ -400,8 +456,9 @@ function setNumTeams(n) {
   n = Math.max(8, Math.min(12, Math.round(n) || 10));
   CONFIG.numTeams = n;
   const cur = CONFIG.teams.slice(0, n);
-  while (cur.length < n) cur.push(`Avv ${cur.length}`);
-  CONFIG.teams = cur;
+  CONFIG.aliases = CONFIG.aliases || {};
+  while (cur.length < n) { const i = cur.length, s = `slot${i + 1}`; cur.push(s); if (!CONFIG.aliases[s]) CONFIG.aliases[s] = `Avv ${i}`; }
+  CONFIG.teams = cur;   // slot ID stabili (mai riusati); gli alias oltre n restano innocui
   if (!CONFIG.teams.includes(CONFIG.myTeam)) CONFIG.myTeam = CONFIG.teams[0];
   persist(); recompute(); renderAll();
 }
@@ -435,10 +492,11 @@ function applyStep(target, d) {
 }
 
 function teamList() {
-  return CONFIG.teams.map((name) => ({
-    id: name === CONFIG.myTeam ? MY_TEAM : name,
-    name,
-    isMe: name === CONFIG.myTeam,
+  return CONFIG.teams.map((slot) => ({
+    id: slot === CONFIG.myTeam ? MY_TEAM : slot,   // id di keying (MY_TEAM per me, slot per gli altri)
+    slot,                                          // slot ID stabile
+    name: alias(slot),                             // etichetta visualizzata (rinominabile)
+    isMe: slot === CONFIG.myTeam,
   }));
 }
 
@@ -618,19 +676,19 @@ function updateOfferSem() {
 function buyActionsHtml(p) {
   if (buyFlow.mode === "chooseOpp") {
     return `<div class="flow-title">A quale squadra è andato?</div>
-      <div class="opp-grid">${CONFIG.teams.filter((o) => o !== CONFIG.myTeam).map((o) => `<button class="btn opp" data-oppteam="${esc(o)}">${esc(o)}</button>`).join("")}</div>
+      <div class="opp-grid">${CONFIG.teams.filter((o) => o !== CONFIG.myTeam).map((o) => `<button class="btn opp" data-oppteam="${esc(o)}">${esc(alias(o))}</button>`).join("")}</div>
       <button class="btn ghost full" data-flow="idle" style="margin-top:8px">← indietro</button>`;
   }
   if (buyFlow.mode === "confirm") {
     const price = buyFlow.price != null ? buyFlow.price : 1;
-    return `<div class="confirm-box">Assegni <b>${esc(p.nome)}</b><br>a <b>${esc(buyFlow.team)}</b> per <b>${price}</b> crediti?</div>
+    return `<div class="confirm-box">Assegni <b>${esc(p.nome)}</b><br>a <b>${esc(teamName(buyFlow.team))}</b> per <b>${price}</b> crediti?</div>
       <div class="buy-actions">
         <button class="btn me" data-confirm="1">✓ OK, conferma</button>
         <button class="btn ghost" data-flow="chooseOpp">← cambia</button>
       </div>`;
   }
   return `<div class="buy-actions">
-      <button class="btn me" data-buy="me">✓ Preso da ${esc(CONFIG.myTeam)}</button>
+      <button class="btn me" data-buy="me">✓ Preso da ${esc(alias(CONFIG.myTeam))}</button>
       <button class="btn opp" data-flow="chooseOpp">Preso da avversario →</button>
     </div>`;
 }
@@ -917,11 +975,11 @@ function renderImpostazioni() {
   const bt = document.getElementById("budgetPerTeam");
   if (bt && document.activeElement !== bt) bt.value = CONFIG.budgetPerTeam;
   const ts = document.getElementById("teamsSettings");
-  if (ts) ts.innerHTML = CONFIG.teams.map((name, i) => {
-    const me = name === CONFIG.myTeam;
+  if (ts) ts.innerHTML = CONFIG.teams.map((slot, i) => {
+    const me = slot === CONFIG.myTeam;
     return `<div class="teamrow ${me ? "me" : ""}">
       <button class="teammark ${me ? "on" : ""}" data-myteam="${i}" title="Segna come la mia squadra">${me ? "⭐" : "☆"}</button>
-      <input type="text" data-teamname="${i}" value="${esc(name)}" />
+      <input type="text" data-teamname="${i}" value="${esc(alias(slot))}" />
     </div>`;
   }).join("");
   renderBackups();
@@ -1288,8 +1346,8 @@ function setScreen(name) {
 }
 
 function teamName(id) {
-  if (id === MY_TEAM) return CONFIG.myTeam;
-  return id;
+  if (id === MY_TEAM) return alias(CONFIG.myTeam);
+  return alias(id);
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
@@ -1456,10 +1514,10 @@ function wire() {
   });
   document.getElementById("teamsSettings").addEventListener("change", (e) => {
     const i = e.target.dataset.teamname; if (i == null) return;
-    const idx = Number(i), old = CONFIG.teams[idx];
-    const val = e.target.value.trim() || `Avv ${idx}`;
-    if (CONFIG.myTeam === old) CONFIG.myTeam = val; // rinomino la MIA squadra → seguo il nuovo nome
-    CONFIG.teams[idx] = val;
+    const slot = CONFIG.teams[Number(i)]; if (!slot) return;
+    const val = e.target.value.trim() || alias(slot);
+    CONFIG.aliases = CONFIG.aliases || {};
+    CONFIG.aliases[slot] = val;   // rinomina = SOLO etichetta: l'identità (slot) e myTeam NON cambiano → niente rose orfane né logout LITE
     persist(); recompute(); renderAll();
   });
   document.getElementById("teamsSettings").addEventListener("click", (e) => {
@@ -1553,8 +1611,9 @@ function buildImportCsv() {
   for (const pu of PURCHASES) {
     const pl = PLAYERS.find((x) => x.id === pu.playerId);
     const fid = pl && pl.fantaId;
-    const appName = pu.team === MY_TEAM ? CONFIG.myTeam : pu.team;   // MY_TEAM -> nome reale della mia squadra
-    const siteName = SITE_TEAM_MAP[appName] || appName;             // fallback: nome così com'è
+    const appSlot = pu.team === MY_TEAM ? CONFIG.myTeam : pu.team;   // MY_TEAM -> il mio slot
+    const nm = alias(appSlot);                                       // nome (alias) dello slot
+    const siteName = SITE_TEAM_MAP[appSlot] || SITE_TEAM_MAP[nm] || nm; // slot->sito, poi nome->sito, poi alias
     if (!fid) { missing.push(pu.nome || pu.playerId); continue; }
     rows.push(`${siteName},${fid},${Math.max(1, Math.round(pu.price || 1))}`);
   }
