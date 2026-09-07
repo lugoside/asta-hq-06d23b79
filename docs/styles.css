@@ -400,3 +400,7 @@ nav.tabs button.on { color: var(--accent2); }
 .fc-prob { font-size: .82rem; margin-top: 4px; }
 .fc-stat { font-size: .76rem; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .fc-note { font-size: .76rem; color: var(--text); margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--line); font-style: italic; }
+/* riga di trasparenza del calcolo (per tarare il motore) */
+.fc-calc { font-size: .72rem; color: var(--muted); margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.fc-calc b { color: var(--accent2); }
+.fc-calc .fc-parts { opacity: .8; }

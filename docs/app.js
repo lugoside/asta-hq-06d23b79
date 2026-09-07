@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v78"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v79"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1550,33 +1550,34 @@ function teamCtx(p, g) {
 // Moltiplicatore di contesto sulla resa del singolo. IMPALCATURA NEUTRA: con
 // FORM_CFG.factors.enabled=false (default) ritorna 1.0 → l'11 non cambia. Il mapping
 // segnali→moltiplicatore e i pesi si definiscono nella fase di tuning (con ok utente).
-function contextMult(p, g) {
+// Moltiplicatore di contesto. Se `parts` (array) è passato, vi appende [etichetta, delta]
+// per ogni fattore attivo (delta = contributo pre-clamp) → per la trasparenza nella card.
+function contextMult(p, g, parts) {
   const F = FORM_CFG.factors;
   if (!F.enabled) return 1;
   const w = F[p.ruolo], c = p._ctx;
   if (!w || !c) return 1;
   const lg = leagueAvg(g);
-  // due riferimenti: media gol SEGNATI nella sede (offensivi) e media gol SUBITI nella sede
-  // (difensivi = gol segnati dalla parte opposta) → normalizzazione corretta per ciascun segnale
-  const refScore = c.venue === "home" ? lg.home : lg.away;
-  const refConc = c.venue === "home" ? lg.away : lg.home;
+  const refScore = c.venue === "home" ? lg.home : lg.away;   // media gol segnati @sede
+  const refConc = c.venue === "home" ? lg.away : lg.home;    // media gol subiti @sede
   const cl = (x) => Math.max(-1, Math.min(1, x));
   let m = 1;
+  const add = (lbl, delta) => { if (delta) { m *= 1 + delta; if (parts) parts.push([lbl, delta]); } };
   // offensivi (gol/assist attesi): difesa avversaria debole + attacco proprio forte → +
-  if (w.offOpp && c.oppGApg != null && refScore) m *= 1 + w.offOpp * cl(c.oppGApg / refScore - 1);
-  if (w.offOwn && c.ownGFpg != null && refScore) m *= 1 + w.offOwn * cl(c.ownGFpg / refScore - 1);
+  if (w.offOpp && c.oppGApg != null && refScore) add("dif.avv", w.offOpp * cl(c.oppGApg / refScore - 1));
+  if (w.offOwn && c.ownGFpg != null && refScore) add("att.pro", w.offOwn * cl(c.ownGFpg / refScore - 1));
   // difensivi (P/D): pochi gol subiti attesi → + (segno negativo perché "meno è meglio")
-  if (w.defOwn && c.ownGApg != null && refConc) m *= 1 - w.defOwn * cl(c.ownGApg / refConc - 1);
-  if (w.defOpp && c.oppGFpg != null && refConc) m *= 1 - w.defOpp * cl(c.oppGFpg / refConc - 1);
+  if (w.defOwn && c.ownGApg != null && refConc) add("dif.pro", -w.defOwn * cl(c.ownGApg / refConc - 1));
+  if (w.defOpp && c.oppGFpg != null && refConc) add("att.avv", -w.defOpp * cl(c.oppGFpg / refConc - 1));
   // forza avversario (classifica): avversario in bassa classifica → +
-  if (w.oppStrength && c.oppRank) m *= 1 + w.oppStrength * ((c.oppRank - 10.5) / 9.5);
+  if (w.oppStrength && c.oppRank) add("forza", w.oppStrength * ((c.oppRank - 10.5) / 9.5));
   // forma recente: media ultime N fantavoti vs FM stagionale
   if (w.form) {
     const dt = g.detail ? g.detail[String(p.fantaId ?? p.id)] : null;
     if (dt && dt.fmSeq && dt.fmSeq.length && dt.fm) {
       const seq = dt.fmSeq.slice(-(F.formWindow || 4));
       const recent = seq.reduce((a, b) => a + b, 0) / seq.length;
-      m *= 1 + w.form * cl(recent / dt.fm - 1);
+      add("forma", w.form * cl(recent / dt.fm - 1));
     }
   }
   const k = F.clamp || 0.15;
@@ -1611,7 +1612,10 @@ function renderFormazione() {
     p._match = (g.teamMatch || {})[p.squadra] || null;
     p._ctx = teamCtx(p, g);                                   // ingredienti grezzi dei fattori
     p._pPlay = pPlay(p._st, p._prob, p.infortunato);          // P(prende voto)
-    p._fv = fvIfPlays(p._st, p._prob, p.infortunato) * contextMult(p, g);  // FV se gioca (con contesto)
+    p._fvBase = fvIfPlays(p._st, p._prob, p.infortunato);     // FV se gioca (senza contesto)
+    p._ctxParts = [];
+    p._ctxMult = contextMult(p, g, p._ctxParts);              // moltiplicatore contesto + scomposizione
+    p._fv = p._fvBase * p._ctxMult;                           // FV se gioca (con contesto)
     p._exp = p._pPlay * p._fv;                                // resa attesa da sola
     p._lab = labelFor(p._prob, p.infortunato);
     p._note = commentSnippet(p.nome, p.squadra, g);
@@ -1666,11 +1670,16 @@ function renderFormazione() {
     const { presTxt, pills } = richStatBits(row, p.ruolo, venue);
     const mvfm = row.pg > 0 ? `${_b(row.mv.toFixed(2))} MV · ${_b(row.fm.toFixed(2))} FM` : "";
     const statTxt = row.pg > 0 ? `${mvfm} · ${presTxt}` : "nessuna statistica";
+    // TRASPARENZA (per tarare giornata per giornata): resa = FV × contesto × P(gioca) + fattori
+    const parts = (p._ctxParts || []).filter(([, d]) => Math.abs(d) >= 0.005)
+      .map(([l, d]) => `${l} ${d >= 0 ? "+" : "−"}${Math.round(Math.abs(d) * 100)}%`).join(" · ");
+    const calcTxt = `🧮 resa <b>${(p._exp || 0).toFixed(2)}</b> = ${(p._fvBase || 0).toFixed(1)} FV × <b>${(p._ctxMult || 1).toFixed(2)}</b> ctx × ${Math.round((p._pPlay || 0) * 100)}% gioca${parts ? `<span class="fc-parts"> · ${parts}</span>` : ""}`;
     return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}${venue ? " has-venue" : ""}">
       <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(shortName(p.nome))}</span><span class="fc-team">${matchTxt}</span>${inXI ? `<span class="xi-badge">11</span>` : ""}</div>
       <div class="fc-prob">${probTxt}</div>
       <div class="fc-stat">${statTxt}</div>
       ${pills ? `<div class="st-pills">${pills}</div>` : ""}
+      <div class="fc-calc">${calcTxt}</div>
       ${p._note ? `<div class="fc-note">💬 ${esc(p._note)}</div>` : ""}
     </div>`;
   }
