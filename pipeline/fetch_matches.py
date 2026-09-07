@@ -145,17 +145,24 @@ def main():
         H["homeGP"] += 1; H["homeGF"] += hg; H["homeGA"] += ag
         A["awayGP"] += 1; A["awayGF"] += ag; A["awayGA"] += hg
 
-    # fonde in giornata.json → detail[fid].match + teamStats
+    # ultima giornata COMPLETATA = max giornata con tutte e 10 le partite in cache
+    from collections import Counter
+    per_gio = Counter(mt["gio"] for mt in cache.values())
+    full = [gg for gg, n in per_gio.items() if n >= 10]
+    last_full = max(full) if full else (max(per_gio) if per_gio else 0)
+
+    # fonde in giornata.json → detail[fid].match + teamStats + lastFullGiornata
     data = json.load(open(GIORNATA, encoding="utf-8")) if os.path.exists(GIORNATA) else {}
     detail = data.setdefault("detail", {})
     for fid, a in agg.items():
         d = detail.setdefault(fid, {})
         d["match"] = a
     data["teamStats"] = teamStats
+    data["lastFullGiornata"] = last_full
     data["numMatchesCache"] = len(cache)
     json.dump(data, open(GIORNATA, "w", encoding="utf-8"), ensure_ascii=False)
 
-    print(f"partite in cache: {len(cache)} (+{fetched} nuove) · miei aggregati: {len(agg)} · teamStats: {len(teamStats)}")
+    print(f"partite in cache: {len(cache)} (+{fetched} nuove) · miei aggregati: {len(agg)} · teamStats: {len(teamStats)} · ultima giornata completa: {last_full}")
     for t in list(teamStats)[:4]:
         s = teamStats[t]
         print(f"  {t}: casa {s['homeGF']}-{s['homeGA']} ({s['homeGP']}g) · tras {s['awayGF']}-{s['awayGA']} ({s['awayGP']}g)")

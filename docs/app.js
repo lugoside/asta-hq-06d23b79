@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v80"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v81"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1590,8 +1590,10 @@ function contextMult(p, g, parts) {
 function pastGiornataBlock(roster, g) {
   const detail = (g && g.detail) || {};
   const keyOf = (p) => String(p.fantaId ?? p.id);
-  let G = 0;
-  roster.forEach((p) => { const bg = (detail[keyOf(p)] || {}).byGio; if (bg) for (const k in bg) G = Math.max(G, +k); });
+  // ultima giornata COMPLETATA (10/10 partite); fallback: max giornata presente tra i miei.
+  // Così durante una giornata in corso si mostra ancora la precedente.
+  let G = (g && g.lastFullGiornata) || 0;
+  if (!G) roster.forEach((p) => { const bg = (detail[keyOf(p)] || {}).byGio; if (bg) for (const k in bg) G = Math.max(G, +k); });
   if (!G) return "";
   const cand = roster.map((p) => {
     const rec = ((detail[keyOf(p)] || {}).byGio || {})[G];
@@ -1691,7 +1693,8 @@ function renderFormazione() {
     return `<div class="fmz-reparto"><div class="rep-title"><span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}</div>${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
   }).join("");
 
-  el.innerHTML = head + xiHtml + reparti + pastGiornataBlock(roster, g);
+  // ordine: 11 giornata passata → 11 consigliato (futura) → lista estesa per giocatore
+  el.innerHTML = head + pastGiornataBlock(roster, g) + xiHtml + reparti;
 
   function card(p, inXI) {
     const st = p._st, pr = p._prob, m = p._match;
