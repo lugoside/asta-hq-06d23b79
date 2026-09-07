@@ -146,8 +146,16 @@ def main():
                 print(f"  probabili senza partite → fallback calendario: {len(tm)} squadre, {len(fx)} partite")
         except Exception as e:
             print(f"  fallback calendario non riuscito: {e}")
-    data = {"stats": stats, **prob, "numGiocatoriStat": len(stats)}
+    # MERGE nel giornata.json esistente: aggiorna stats/probabili/teamMatch/fixtures/commento
+    # ma PRESERVA le chiavi degli altri scraper (detail, teamStats, classifica, lastFullGiornata)
+    # → così una run "solo probabili" non cancella i dati del motore.
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    data = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
+    data["stats"] = stats
+    data["numGiocatoriStat"] = len(stats)
+    for k in ("probabili", "teamMatch", "fixtures", "commento"):
+        if k in prob:
+            data[k] = prob[k]
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     print(f"giornata.json scritto: {os.path.abspath(OUT)}")

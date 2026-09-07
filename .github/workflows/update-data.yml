@@ -16,12 +16,20 @@ on:
   push:
   workflow_dispatch:
   schedule:
-    # STAGIONE: ogni notte alle 00:00 UTC (~02:00 IT in estate / 01:00 in inverno).
+    # Ogni notte alle ~02:00 ora italiana TUTTO L'ANNO (due cron per gestire l'ora legale):
+    #  - estate (CEST, UTC+2), mesi 3-10 → 00:00 UTC = 02:00 IT
+    #  - inverno (CET, UTC+1), mesi 11-2 → 01:00 UTC = 02:00 IT
+    # (nei pochi giorni a cavallo del cambio d'ora può essere 01:00/03:00: irrilevante, decide il gate).
     # Il job "gate" fa girare l'aggiornamento SOLO la notte dopo l'ultima partita di una
     # giornata di Serie A (ieri partite, oggi no); le altre notti esce subito.
-    # NB: il cron di GitHub è best-effort (può ritardare di ore). Per un giro immediato:
-    # avvio manuale (Setup → ⚡ o "Run workflow"), che salta il gate ed esegue sempre.
-    - cron: "0 0 * * *"
+    # NB: il cron di GitHub è best-effort (può ritardare di ore). Giro immediato: avvio manuale
+    # (Setup → ⚡ o "Run workflow"), che salta il gate ed esegue sempre.
+    - cron: "0 0 * 3-10 *"       # FULL post-giornata, estate
+    - cron: "0 1 * 1,2,11,12 *"  # FULL post-giornata, inverno
+    # PROBABILI: ogni ora nella finestra diurna (07-20 UTC ≈ 08/09-21/22 IT). Il gate
+    # should_run_probabili esegue davvero solo negli slot voluti (giorno prima ogni 3h;
+    # giorno-gara ogni 2h fino a ~1-2h prima del calcio d'inizio della 1ª partita del turno).
+    - cron: "0 7-20 * * *"
 
 permissions:
   contents: write
@@ -38,7 +46,11 @@ jobs:
   # GATE: decide se stanotte serve aggiornare (giorno dopo l'ultima partita di una giornata).
   # Sul workflow_dispatch (avvio manuale) forza sempre l'esecuzione.
   gate:
-    if: github.event_name != 'push'
+    # solo sui cron FULL delle 02:00 (o su avvio manuale), NON sul cron orario probabili
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.schedule == '0 0 * 3-10 *' ||
+      github.event.schedule == '0 1 * 1,2,11,12 *'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
@@ -53,9 +65,9 @@ jobs:
           FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
         run: python pipeline/should_update.py
   update:
-    # l'aggiornamento vero NON gira sul push; sullo schedule solo se il gate lo consente
+    # aggiornamento COMPLETO (post-giornata / manuale): solo se il gate lo consente
     needs: gate
-    if: github.event_name != 'push' && needs.gate.outputs.should_run == 'true'
+    if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,3 +141,45 @@ jobs:
             git push
             echo "players_lite.json pubblicato nel repo LITE."
           fi
+
+  # --- PROBABILI: aggiornamento LEGGERO e frequente (solo fetch_giornata in MERGE) ---
+  # Gira sul cron orario; il gate esegue davvero solo negli slot di avvicinamento al turno.
+  probabili-gate:
+    if: github.event.schedule == '0 7-20 * * *'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: check
+        name: Esegui i probabili solo negli slot voluti (giorno prima 3h / giorno gara 2h)
+        run: python pipeline/should_run_probabili.py
+  probabili:
+    needs: probabili-gate
+    if: needs.probabili-gate.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Aggiorna SOLO i probabili di giornata (merge, preserva i dati del motore)
+        run: python pipeline/fetch_giornata.py || echo "probabili non aggiornati (fonte non disponibile), proseguo"
+      - name: Commit probabili
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/giornata.json
+          if git diff --cached --quiet; then
+            echo "Probabili invariati: niente da pubblicare."; exit 0
+          fi
+          git commit -m "chore: aggiorna probabili di giornata [skip ci]"
+          for i in 1 2 3; do
+            if git push; then echo "Probabili pubblicati (tentativo $i)."; exit 0; fi
+            echo "Push rifiutato: riallineo (tentativo $i)…"
+            git pull --rebase --autostash origin main || true
+          done
+          echo "Push probabili non riuscito dopo 3 tentativi."; exit 1
