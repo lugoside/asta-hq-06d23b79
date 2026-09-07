@@ -1423,8 +1423,6 @@ function fvIfPlays(st, prob, injured) {
   const bonusRate = (st && st.pg > 0 && st.mfv && st.mv) ? Math.max(0, st.mfv - st.mv) : 0;
   return sub.base + sub.bonusW * bonusRate;
 }
-// resa attesa "da sola" (senza copertura panchina) = P(gioca) × FV(se gioca)
-function expScore(st, prob, injured) { return pPlay(st, prob, injured) * fvIfPlays(st, prob, injured); }
 function labelFor(prob, injured) {
   if (injured) return { t: "Panchina", k: "no" };
   if (!prob) return { t: "Panchina", k: "no" };
