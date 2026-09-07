@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v79"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v80"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1584,6 +1584,47 @@ function contextMult(p, g, parts) {
   return Math.max(1 - k, Math.min(1 + k, m));
 }
 
+// CONSUNTIVO della giornata PASSATA: l'11 ideale (col senno di poi) coi fantavoti REALI,
+// modulo che avrebbe reso di più (Σ FV + modificatore difesa) e panchina per rendimento.
+// Dati: detail[fid].byGio[G] = {mv, fm} della giornata G (ultima giocata tra i miei).
+function pastGiornataBlock(roster, g) {
+  const detail = (g && g.detail) || {};
+  const keyOf = (p) => String(p.fantaId ?? p.id);
+  let G = 0;
+  roster.forEach((p) => { const bg = (detail[keyOf(p)] || {}).byGio; if (bg) for (const k in bg) G = Math.max(G, +k); });
+  if (!G) return "";
+  const cand = roster.map((p) => {
+    const rec = ((detail[keyOf(p)] || {}).byGio || {})[G];
+    return rec ? { p, fm: +rec.fm || 0, mv: +rec.mv || 0 } : null;
+  }).filter(Boolean);
+  if (!cand.length) return "";
+  const byRole = { P: [], D: [], C: [], A: [] };
+  cand.forEach((x) => byRole[x.p.ruolo] && byRole[x.p.ruolo].push(x));
+  for (const r of ROLES) byRole[r].sort((a, b) => b.fm - a.fm);
+  let best = null;
+  for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
+    if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
+    const keeper = byRole.P[0], defs = byRole.D.slice(0, nd);
+    const xi = [keeper, ...defs, ...byRole.C.slice(0, nc), ...byRole.A.slice(0, na)];
+    const sumFV = xi.reduce((s, x) => s + x.fm, 0);
+    const defMod = defenseModifier(defs.map((x) => x.mv), keeper.mv);
+    const total = sumFV + defMod, goals = goalsFromScore(total);
+    if (!best || total > best.total) best = { mod, xi, defMod, total, goals };
+  }
+  if (!best) return "";
+  const xiIds = new Set(best.xi.map((x) => x.p.id));
+  const bench = cand.filter((x) => !xiIds.has(x.p.id)).sort((a, b) => b.fm - a.fm);
+  const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
+  const line = (r) => best.xi.filter((x) => x.p.ruolo === r).map((x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>`).join(", ");
+  const benchHtml = bench.map((x) => `<span class="pg-b"><span class="rp ${x.p.ruolo} xs">${x.p.ruolo}</span> ${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span></span>`).join("");
+  return `<div class="fmz-past">
+    <div class="xi-top"><b>📅 Giornata ${G} — 11 ideale</b> <span class="meta">(col senno di poi)</span></div>
+    <div class="xi-proj">punteggio <b>${best.total.toFixed(1)}</b>${best.defMod ? ` <span class="meta">(+${best.defMod} dif)</span>` : ""} · <b>${best.goals}</b> gol · modulo <b>${best.mod}</b></div>
+    ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${line(r) || "<span class='meta'>—</span>"}</div>`).join("")}
+    ${bench.length ? `<div class="pg-bench"><div class="xi-top"><b>Panchina</b> <span class="meta">(per rendimento)</span></div><div class="pg-bench-l">${benchHtml}</div></div>` : ""}
+  </div>`;
+}
+
 function renderFormazione() {
   const el = document.getElementById("formazioneBody");
   // demo raggiungibile solo via URL ?fdemo=1 (backdoor per rifiniture; nessun pulsante visibile)
@@ -1650,7 +1691,7 @@ function renderFormazione() {
     return `<div class="fmz-reparto"><div class="rep-title"><span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}</div>${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
   }).join("");
 
-  el.innerHTML = head + xiHtml + reparti;
+  el.innerHTML = head + xiHtml + reparti + pastGiornataBlock(roster, g);
 
   function card(p, inXI) {
     const st = p._st, pr = p._prob, m = p._match;
