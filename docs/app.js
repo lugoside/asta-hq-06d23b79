@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v84"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v85"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1632,7 +1632,10 @@ function pastGiornataBlock(roster, g) {
   const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
   const tag = (x) => x.rinvio ? ' <span class="pg-rinvio" title="6 politico (gara rinviata)">🔁</span>' : "";
   const nameTag = (x) => `${esc(shortName(x.p.nome))}${tag(x)}`;
-  const chip = (x) => `${nameTag(x)} <span class="pg-fv">(${fmt(x.fm)})</span>`;
+  // mostra VOTO + (bonus/malus) per tutti → il fantavoto è voto+bonus e il modificatore
+  // (che usa i voti) è verificabile a occhio. es. Bracaglia 7.5 (+3.5) = FM 11.
+  const bonusStr = (x) => { const b = Math.round((x.fm - x.mv) * 100) / 100; return b ? ` <span class="pg-bonus">(${b > 0 ? "+" : "−"}${fmt(Math.abs(b))})</span>` : ""; };
+  const chip = (x) => `${nameTag(x)} <span class="pg-fv">${fmt(x.mv)}</span>${bonusStr(x)}`;
   // confine dell'11 per ruolo = FV del titolare più debole; i PARI-VOTO al confine
   // (titolari + panchinari con lo stesso FV) sono ALTERNATIVE intercambiabili → raggruppati.
   const boundary = {};
@@ -1654,7 +1657,7 @@ function pastGiornataBlock(roster, g) {
     if (hasAlt) {
       const nStart = starters.filter((x) => x.fm === b).length;            // slot al confine
       const tied = cand.filter((x) => x.p.ruolo === r && x.fm === b).sort((a, c) => a.p.nome.localeCompare(c.p.nome));
-      parts.push(`<span class="pg-alt">${tied.map(nameTag).join(" / ")} <span class="pg-fv">(${fmt(b)})</span> <span class="meta">· ${nStart} su ${tied.length}</span></span>`);
+      parts.push(`<span class="pg-alt">${tied.map(chip).join(" / ")} <span class="meta">· ${nStart} su ${tied.length}</span></span>`);
     } else {
       starters.filter((x) => x.fm === b).forEach((x) => parts.push(chip(x)));
     }

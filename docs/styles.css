@@ -416,6 +416,7 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-past .xi-proj { font-size: .84rem; color: var(--muted); margin: 2px 0 8px; }
 .fmz-past .xi-proj b { color: var(--accent2); }
 .pg-fv { color: var(--accent2); font-weight: 700; }
+.pg-bonus { color: var(--muted); font-weight: 600; font-size: .95em; }
 .pg-bench { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 /* gruppo di alternative pari-voto nell'11 ideale (A / B, intercambiabili) */
 .fmz-past .pg-alt { font-style: italic; }
