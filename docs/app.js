@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v77"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v78"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1395,15 +1395,24 @@ function activeRoster() {
 }
 
 // resa attesa: fantamedia (se ci sono partite) o media di ruolo, moderata dalla disponibilità
-function expScore(st, prob, injured) {
+// P(il giocatore prende voto) — titolare: perc; riserva: prob. di subentro; non-probabile: 0.15; infortunato: 0
+function pPlay(st, prob, injured) {
+  if (injured) return 0;
+  if (!prob) return 0.15;
+  if (prob.status === "titolare") return (prob.perc ?? 70) / 100;
+  return (prob.perc ?? 0) / 100;
+}
+// FV atteso SE gioca — titolare/non-prob: FM stagionale; riserva: cameo bonus-aware (voto + parte del bonus/gara)
+function fvIfPlays(st, prob, injured) {
   if (injured) return 0;
   const base = (st && st.pg > 0 && st.mfv) ? st.mfv : 6.0;
-  let avail;
-  if (!prob) avail = 0.15;                                   // non tra i probabili
-  else if (prob.status === "titolare") avail = (prob.perc ?? 70) / 100;
-  else avail = ((prob.perc ?? 0) / 100) * 0.35;             // riserva: pochi minuti
-  return base * avail;
+  if (!prob || prob.status === "titolare") return base;
+  const sub = FORM_CFG.sub || { base: 6.0, bonusW: 0.5 };
+  const bonusRate = (st && st.pg > 0 && st.mfv && st.mv) ? Math.max(0, st.mfv - st.mv) : 0;
+  return sub.base + sub.bonusW * bonusRate;
 }
+// resa attesa "da sola" (senza copertura panchina) = P(gioca) × FV(se gioca)
+function expScore(st, prob, injured) { return pPlay(st, prob, injured) * fvIfPlays(st, prob, injured); }
 function labelFor(prob, injured) {
   if (injured) return { t: "Panchina", k: "no" };
   if (!prob) return { t: "Panchina", k: "no" };
@@ -1424,6 +1433,8 @@ function commentSnippet(nome, squadra, g) {
 // → bonus a bande; si applica solo con ≥ minDef difensori a voto.
 const FORM_CFG = {
   goalThresholds: [66, 72, 77, 81, 85, 89, 93, 97, 101],
+  // valore del SUBENTRANTE (riserva): P(subentro) × (base + bonusW × bonus/gara)
+  sub: { base: 6.0, bonusW: 0.5 },
   defMod: {
     includeKeeper: true,
     minDef: 4,
@@ -1477,8 +1488,10 @@ function defenseModifier(defVotes, keeperVote) {
   for (const [th, b] of cfg.bands) { if (avg >= th) bonus = b; }
   return bonus;
 }
-// migliore XI sui 7 moduli: massimizza il PUNTEGGIO DI SQUADRA proiettato = somma rese
-// (Σ fantavoti attesi) + modificatore difesa; espone anche i gol proiettati (soglie).
+// migliore XI sui 7 moduli, con SOSTITUZIONE AUTOMATICA: il valore di uno slot dell'11 =
+// P(gioca)×FV del titolare + (1−P)×[copertura], dove la copertura è la prima riserva dello
+// STESSO RUOLO in panchina (le riserve più forti coprono i titolari più a rischio). Il totale
+// (Σ slot + modificatore difesa) è il punteggio-squadra atteso → gol proiettati via soglie.
 function bestXI(players) {
   const byRole = { P: [], D: [], C: [], A: [] };
   players.forEach((p) => (byRole[p.ruolo] || (byRole[p.ruolo] = [])).push(p));
@@ -1486,14 +1499,25 @@ function bestXI(players) {
   let best = null;
   for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
     if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
-    const keeper = byRole.P[0];
-    const defs = byRole.D.slice(0, nd);
-    const xi = [keeper, ...defs, ...byRole.C.slice(0, nc), ...byRole.A.slice(0, na)];
-    const teamFV = xi.reduce((s, p) => s + p._exp, 0);          // Σ fantavoti attesi
-    const defMod = defenseModifier(defs.map(expVoto), expVoto(keeper));
-    const total = teamFV + defMod;                              // punteggio squadra proiettato
+    const need = { P: 1, D: nd, C: nc, A: na };
+    const xi = [], defs = [];
+    let total = 0;
+    for (const r of ROLES) {
+      const starters = byRole[r].slice(0, need[r]);
+      const bench = byRole[r].slice(need[r]);
+      // le riserve migliori (bench[], già ordinate per resa) coprono i titolari più a rischio
+      const risky = starters.map((s) => s).sort((a, b) => a._pPlay - b._pPlay);
+      risky.forEach((s, k) => {
+        const cover = bench[k];
+        total += s._pPlay * s._fv + (1 - s._pPlay) * (cover ? cover._exp : 0);
+      });
+      xi.push(...starters);
+      if (r === "D") defs.push(...starters);
+    }
+    const defMod = defenseModifier(defs.map(expVoto), expVoto(byRole.P[0]));
+    total += defMod;
     const goals = goalsFromScore(total);
-    if (!best || total > best.total) best = { mod, xi, teamFV, defMod, total, goals };
+    if (!best || total > best.total) best = { mod, xi, defMod, total, goals };
   }
   return best;
 }
@@ -1586,7 +1610,9 @@ function renderFormazione() {
     p._prob = (g.probabili || {})[k] || null;
     p._match = (g.teamMatch || {})[p.squadra] || null;
     p._ctx = teamCtx(p, g);                                   // ingredienti grezzi dei fattori
-    p._exp = expScore(p._st, p._prob, p.infortunato) * contextMult(p, g);
+    p._pPlay = pPlay(p._st, p._prob, p.infortunato);          // P(prende voto)
+    p._fv = fvIfPlays(p._st, p._prob, p.infortunato) * contextMult(p, g);  // FV se gioca (con contesto)
+    p._exp = p._pPlay * p._fv;                                // resa attesa da sola
     p._lab = labelFor(p._prob, p.infortunato);
     p._note = commentSnippet(p.nome, p.squadra, g);
   });
