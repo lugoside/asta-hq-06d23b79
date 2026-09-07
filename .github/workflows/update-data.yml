@@ -98,6 +98,8 @@ jobs:
         run: python pipeline/fetch_classifica.py || echo "classifica non aggiornata (fonte non disponibile), proseguo"
       - name: Dati match-by-match della mia rosa + GF/GA casa/trasferta per squadra
         run: python pipeline/fetch_matches.py || echo "match rosa non aggiornati (fonte non disponibile), proseguo"
+      - name: Posticipi/sospensioni (6 politico regola lega) + raffina giornata completa
+        run: python pipeline/fetch_rinvii.py || echo "rinvii non calcolati (fonte non disponibile), proseguo"
       - name: Commit e pubblica (robusto ai race)
         run: |
           git config user.name "github-actions[bot]"
@@ -168,6 +170,8 @@ jobs:
           python-version: "3.12"
       - name: Aggiorna SOLO i probabili di giornata (merge, preserva i dati del motore)
         run: python pipeline/fetch_giornata.py || echo "probabili non aggiornati (fonte non disponibile), proseguo"
+      - name: Rinvii/6 politico (tiene fresca la regola posticipi anche in settimana)
+        run: python pipeline/fetch_rinvii.py || echo "rinvii non calcolati, proseguo"
       - name: Commit probabili
         run: |
           git config user.name "github-actions[bot]"

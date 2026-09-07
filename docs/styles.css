@@ -377,6 +377,10 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-xi .xi-top { font-size: .92rem; margin-bottom: 4px; }
 .fmz-xi .xi-proj { font-size: .84rem; color: var(--muted); margin-bottom: 10px; }
 .fmz-xi .xi-proj b { color: var(--accent2); }
+.fmz-xi .fmz-updated { font-size: .76rem; color: var(--muted); margin: -2px 0 10px; }
+.fmz-xi .fmz-updated b { color: var(--text); }
+.fmz-xi .fmz-rinvio { font-size: .78rem; color: var(--giallo); margin: -4px 0 10px; }
+.fmz-past .pg-rinvio { cursor: help; }
 .fmz-xi .xi-line { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .86rem; }
 .xi-bench { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: .82rem; }
 .bench-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

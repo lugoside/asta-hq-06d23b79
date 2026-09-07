@@ -14,7 +14,7 @@ Output: docs/data/giornata.json  (consumato dalla schermata Formazione della FUL
 
 Uso:  python fetch_giornata.py
 """
-import urllib.request, re, json, os, html as ihtml
+import urllib.request, re, json, os, html as ihtml, datetime
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -156,6 +156,8 @@ def main():
     for k in ("probabili", "teamMatch", "fixtures", "commento"):
         if k in prob:
             data[k] = prob[k]
+    # timestamp UTC dell'ultimo aggiornamento dati di giornata (mostrato in app in forma relativa)
+    data["aggiornato"] = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     print(f"giornata.json scritto: {os.path.abspath(OUT)}")

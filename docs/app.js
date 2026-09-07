@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v81"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v82"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1381,6 +1381,18 @@ const teamAbbr = (name) => name ? (TEAM_ABBR[name] || _deac(name).replace(/[^a-z
 function giornataActive() { return formDemo ? formDemo.g : GIORNATA; }
 const RUOLI_NOME = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
 
+// "oggi/ieri/N giorni fa, ore HH:MM" da un timestamp ISO (ora locale del dispositivo)
+function fmtLastData(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diff = Math.round((day(new Date()) - day(d)) / 86400000);
+  const ora = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  const quando = diff <= 0 ? "oggi" : diff === 1 ? "ieri" : `${diff} giorni fa`;
+  return `${quando}, ore ${ora}`;
+}
+
 // attiva la demo se richiesta via URL (?fdemo=1); usata da Formazione e da Analisi (rosa stagionale)
 function ensureDemoIfRequested() {
   if (!formDemo && /[?&]fdemo\b/.test(location.search) && PLAYERS.length) formDemo = buildFormDemo();
@@ -1595,9 +1607,13 @@ function pastGiornataBlock(roster, g) {
   let G = (g && g.lastFullGiornata) || 0;
   if (!G) roster.forEach((p) => { const bg = (detail[keyOf(p)] || {}).byGio; if (bg) for (const k in bg) G = Math.max(G, +k); });
   if (!G) return "";
+  // squadre con gara rinviata-oltre in G → 6 politico ai loro giocatori (regola lega)
+  const rinviate = (g && g.rinvii) ? new Set(g.rinvii[String(G)] || []) : new Set();
   const cand = roster.map((p) => {
     const rec = ((detail[keyOf(p)] || {}).byGio || {})[G];
-    return rec ? { p, fm: +rec.fm || 0, mv: +rec.mv || 0 } : null;
+    if (rec) return { p, fm: +rec.fm || 0, mv: +rec.mv || 0, rinvio: false };
+    if (rinviate.has(p.squadra)) return { p, fm: 6, mv: 6, rinvio: true };  // 6 politico
+    return null;
   }).filter(Boolean);
   if (!cand.length) return "";
   const byRole = { P: [], D: [], C: [], A: [] };
@@ -1617,8 +1633,9 @@ function pastGiornataBlock(roster, g) {
   const xiIds = new Set(best.xi.map((x) => x.p.id));
   const bench = cand.filter((x) => !xiIds.has(x.p.id)).sort((a, b) => b.fm - a.fm);
   const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
-  const line = (r) => best.xi.filter((x) => x.p.ruolo === r).map((x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>`).join(", ");
-  const benchHtml = bench.map((x) => `<span class="pg-b"><span class="rp ${x.p.ruolo} xs">${x.p.ruolo}</span> ${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span></span>`).join("");
+  const tag = (x) => x.rinvio ? ' <span class="pg-rinvio" title="6 politico (gara rinviata)">🔁</span>' : "";
+  const line = (r) => best.xi.filter((x) => x.p.ruolo === r).map((x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}`).join(", ");
+  const benchHtml = bench.map((x) => `<span class="pg-b"><span class="rp ${x.p.ruolo} xs">${x.p.ruolo}</span> ${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}</span>`).join("");
   return `<div class="fmz-past">
     <div class="xi-top"><b>📅 Giornata ${G} — 11 ideale</b> <span class="meta">(col senno di poi)</span></div>
     <div class="xi-proj">punteggio <b>${best.total.toFixed(1)}</b>${best.defMod ? ` <span class="meta">(+${best.defMod} dif)</span>` : ""} · <b>${best.goals}</b> gol · modulo <b>${best.mod}</b></div>
@@ -1647,6 +1664,8 @@ function renderFormazione() {
     return;
   }
 
+  // squadre con gara RINVIATA-OLTRE nella giornata corrente → 6 politico ai loro giocatori
+  const rinviate = (g.rinvii && g.giornataCorrente != null) ? new Set(g.rinvii[String(g.giornataCorrente)] || []) : new Set();
   // arricchisci ogni giocatore con stat, probabile, match, resa, etichetta
   roster.forEach((p) => {
     const k = String(p.fantaId ?? p.id);  // giornata.json è chiavato sul fantaId
@@ -1654,13 +1673,20 @@ function renderFormazione() {
     p._prob = (g.probabili || {})[k] || null;
     p._match = (g.teamMatch || {})[p.squadra] || null;
     p._ctx = teamCtx(p, g);                                   // ingredienti grezzi dei fattori
-    p._pPlay = pPlay(p._st, p._prob, p.infortunato);          // P(prende voto)
-    p._fvBase = fvIfPlays(p._st, p._prob, p.infortunato);     // FV se gioca (senza contesto)
-    p._ctxParts = [];
-    p._ctxMult = contextMult(p, g, p._ctxParts);              // moltiplicatore contesto + scomposizione
-    p._fv = p._fvBase * p._ctxMult;                           // FV se gioca (con contesto)
-    p._exp = p._pPlay * p._fv;                                // resa attesa da sola
-    p._lab = labelFor(p._prob, p.infortunato);
+    p._rinvio6 = !p.infortunato && rinviate.has(p.squadra);   // gara rinviata-oltre → 6 politico garantito
+    if (p._rinvio6) {
+      // 6 politico: voto certo 6, nessun bonus/malus, nessun contesto; prende sempre voto
+      p._pPlay = 1; p._fvBase = 6; p._ctxMult = 1; p._ctxParts = []; p._fv = 6; p._exp = 6;
+      p._lab = { t: "6 politico", k: "maybe" };
+    } else {
+      p._pPlay = pPlay(p._st, p._prob, p.infortunato);        // P(prende voto)
+      p._fvBase = fvIfPlays(p._st, p._prob, p.infortunato);   // FV se gioca (senza contesto)
+      p._ctxParts = [];
+      p._ctxMult = contextMult(p, g, p._ctxParts);            // moltiplicatore contesto + scomposizione
+      p._fv = p._fvBase * p._ctxMult;                         // FV se gioca (con contesto)
+      p._exp = p._pPlay * p._fv;                              // resa attesa da sola
+      p._lab = labelFor(p._prob, p.infortunato);
+    }
     p._note = commentSnippet(p.nome, p.squadra, g);
   });
 
@@ -1678,9 +1704,13 @@ function renderFormazione() {
       ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
     </div>` : "";
     const projTxt = `punteggio <b>${xi.total.toFixed(1)}</b>${xi.defMod ? ` <span class="meta">(+${xi.defMod} dif)</span>` : ""} · <b>${xi.goals}</b> gol proiettati`;
+    const updated = fmtLastData(g && g.aggiornato);
+    const rinvioXi = xi.xi.filter((p) => p._rinvio6).map((p) => esc(shortName(p.nome)));
     xiHtml = `<div class="fmz-xi">
       <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b></div>
       <div class="xi-proj">${projTxt}</div>
+      ${updated ? `<div class="fmz-updated">🕒 Ultimo dato: <b>${updated}</b></div>` : ""}
+      ${rinvioXi.length ? `<div class="fmz-rinvio">🔁 In lista col <b>6 politico</b> (gara rinviata): ${rinvioXi.join(", ")}</div>` : ""}
       ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
       ${benchHtml}
     </div>`;
@@ -1699,7 +1729,8 @@ function renderFormazione() {
   function card(p, inXI) {
     const st = p._st, pr = p._prob, m = p._match;
     const perc = pr && pr.perc != null ? pr.perc + "%" : "";
-    const probTxt = p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
+    const probTxt = p._rinvio6 ? `🔁 gara rinviata → <b>6 politico</b> garantito`
+      : p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
       : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟡"} titolare ${perc}` : `⚪ riserva ${perc} (subentro)`)
       : "⚪ non tra i probabili";
     // scontro di giornata: sigla della SUA squadra in MAIUSCOLO grassetto, avversario minuscolo,
