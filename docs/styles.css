@@ -417,3 +417,5 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-past .xi-proj b { color: var(--accent2); }
 .pg-fv { color: var(--accent2); font-weight: 700; }
 .pg-bench { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+/* gruppo di alternative pari-voto nell'11 ideale (A / B, intercambiabili) */
+.fmz-past .pg-alt { font-style: italic; }

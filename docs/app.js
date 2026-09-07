@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v83"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v84"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1629,20 +1629,48 @@ function pastGiornataBlock(roster, g) {
   }
   if (!best) return "";
   const xiIds = new Set(best.xi.map((x) => x.p.id));
-  const bench = cand.filter((x) => !xiIds.has(x.p.id)).sort((a, b) => b.fm - a.fm);
   const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
   const tag = (x) => x.rinvio ? ' <span class="pg-rinvio" title="6 politico (gara rinviata)">🔁</span>' : "";
-  const chip = (x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}`;
-  // righe per ruolo, i nomi vanno a capo (niente scroll orizzontale su mobile)
-  const roleLine = (arr, r) => {
-    const l = arr.filter((x) => x.p.ruolo === r).sort((a, b) => b.fm - a.fm).map(chip).join(", ");
-    return `<div class="xi-line"><span class="rp ${r}">${r}</span> <span class="pg-names">${l || "<span class='meta'>—</span>"}</span></div>`;
+  const nameTag = (x) => `${esc(shortName(x.p.nome))}${tag(x)}`;
+  const chip = (x) => `${nameTag(x)} <span class="pg-fv">(${fmt(x.fm)})</span>`;
+  // confine dell'11 per ruolo = FV del titolare più debole; i PARI-VOTO al confine
+  // (titolari + panchinari con lo stesso FV) sono ALTERNATIVE intercambiabili → raggruppati.
+  const boundary = {};
+  ROLES.forEach((r) => {
+    const st = best.xi.filter((x) => x.p.ruolo === r).map((x) => x.fm);
+    boundary[r] = st.length ? Math.min(...st) : null;
+  });
+  const inAltGroup = (x) => boundary[x.p.ruolo] != null && x.fm === boundary[x.p.ruolo]
+    && cand.filter((y) => y.p.ruolo === x.p.ruolo && y.fm === boundary[x.p.ruolo]).length
+       > best.xi.filter((y) => y.p.ruolo === x.p.ruolo && y.fm === boundary[x.p.ruolo]).length;
+  // riga XI per ruolo: titolari "bloccati" (FV > confine) + eventuale gruppo di alternative pari-voto
+  const xiLine = (r) => {
+    const starters = best.xi.filter((x) => x.p.ruolo === r).sort((a, b) => b.fm - a.fm);
+    if (!starters.length) return `<div class="xi-line"><span class="rp ${r}">${r}</span> <span class="pg-names"><span class="meta">—</span></span></div>`;
+    const b = boundary[r];
+    const hasAlt = cand.filter((y) => y.p.ruolo === r && y.fm === b).length > starters.filter((x) => x.fm === b).length;
+    const locked = starters.filter((x) => x.fm > b);
+    const parts = locked.map(chip);
+    if (hasAlt) {
+      const nStart = starters.filter((x) => x.fm === b).length;            // slot al confine
+      const tied = cand.filter((x) => x.p.ruolo === r && x.fm === b).sort((a, c) => a.p.nome.localeCompare(c.p.nome));
+      parts.push(`<span class="pg-alt">${tied.map(nameTag).join(" / ")} <span class="pg-fv">(${fmt(b)})</span> <span class="meta">· ${nStart} su ${tied.length}</span></span>`);
+    } else {
+      starters.filter((x) => x.fm === b).forEach((x) => parts.push(chip(x)));
+    }
+    return `<div class="xi-line"><span class="rp ${r}">${r}</span> <span class="pg-names">${parts.join(", ")}</span></div>`;
+  };
+  // panchina: chi NON è nell'11 e NON è tra le alternative pari-voto (mostrate sopra) → FV più basso
+  const bench = cand.filter((x) => !xiIds.has(x.p.id) && !inAltGroup(x)).sort((a, b) => b.fm - a.fm);
+  const benchLine = (r) => {
+    const l = bench.filter((x) => x.p.ruolo === r).map(chip).join(", ");
+    return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> <span class="pg-names">${l}</span></div>` : "";
   };
   return `<div class="fmz-past">
     <div class="xi-top"><b>📅 Giornata ${G} — 11 ideale</b> <span class="meta">(col senno di poi)</span></div>
     <div class="xi-proj">punteggio <b>${best.total.toFixed(1)}</b>${best.defMod ? ` <span class="meta">(+${best.defMod} dif)</span>` : ""} · <b>${best.goals}</b> gol · modulo <b>${best.mod}</b></div>
-    ${ROLES.map((r) => roleLine(best.xi, r)).join("")}
-    ${bench.length ? `<div class="pg-bench"><div class="xi-top"><b>Panchina</b> <span class="meta">(per ruolo · rendimento)</span></div>${ROLES.map((r) => bench.some((x) => x.p.ruolo === r) ? roleLine(bench, r) : "").join("")}</div>` : ""}
+    ${ROLES.map(xiLine).join("")}
+    ${bench.length ? `<div class="pg-bench"><div class="xi-top"><b>Panchina</b> <span class="meta">(per ruolo · rendimento)</span></div>${ROLES.map(benchLine).join("")}</div>` : ""}
   </div>`;
 }
 
