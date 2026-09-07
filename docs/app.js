@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v82"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v83"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1632,13 +1632,17 @@ function pastGiornataBlock(roster, g) {
   const bench = cand.filter((x) => !xiIds.has(x.p.id)).sort((a, b) => b.fm - a.fm);
   const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
   const tag = (x) => x.rinvio ? ' <span class="pg-rinvio" title="6 politico (gara rinviata)">🔁</span>' : "";
-  const line = (r) => best.xi.filter((x) => x.p.ruolo === r).map((x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}`).join(", ");
-  const benchHtml = bench.map((x) => `<span class="pg-b"><span class="rp ${x.p.ruolo} xs">${x.p.ruolo}</span> ${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}</span>`).join("");
+  const chip = (x) => `${esc(shortName(x.p.nome))} <span class="pg-fv">(${fmt(x.fm)})</span>${tag(x)}`;
+  // righe per ruolo, i nomi vanno a capo (niente scroll orizzontale su mobile)
+  const roleLine = (arr, r) => {
+    const l = arr.filter((x) => x.p.ruolo === r).sort((a, b) => b.fm - a.fm).map(chip).join(", ");
+    return `<div class="xi-line"><span class="rp ${r}">${r}</span> <span class="pg-names">${l || "<span class='meta'>—</span>"}</span></div>`;
+  };
   return `<div class="fmz-past">
     <div class="xi-top"><b>📅 Giornata ${G} — 11 ideale</b> <span class="meta">(col senno di poi)</span></div>
     <div class="xi-proj">punteggio <b>${best.total.toFixed(1)}</b>${best.defMod ? ` <span class="meta">(+${best.defMod} dif)</span>` : ""} · <b>${best.goals}</b> gol · modulo <b>${best.mod}</b></div>
-    ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${line(r) || "<span class='meta'>—</span>"}</div>`).join("")}
-    ${bench.length ? `<div class="pg-bench"><div class="xi-top"><b>Panchina</b> <span class="meta">(per rendimento)</span></div><div class="pg-bench-l">${benchHtml}</div></div>` : ""}
+    ${ROLES.map((r) => roleLine(best.xi, r)).join("")}
+    ${bench.length ? `<div class="pg-bench"><div class="xi-top"><b>Panchina</b> <span class="meta">(per ruolo · rendimento)</span></div>${ROLES.map((r) => bench.some((x) => x.p.ruolo === r) ? roleLine(bench, r) : "").join("")}</div>` : ""}
   </div>`;
 }
 

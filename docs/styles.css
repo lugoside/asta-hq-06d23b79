@@ -410,10 +410,10 @@ nav.tabs button.on { color: var(--accent2); }
 .fc-calc .fc-parts { opacity: .8; }
 /* consuntivo giornata passata (11 ideale col senno di poi) */
 .fmz-past { margin: 14px 14px 0; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
-.fmz-past .xi-line { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .86rem; }
+.fmz-past .xi-line { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: .86rem; }
+/* i nomi vanno a capo dentro la riga (min-width:0 evita l'overflow orizzontale) */
+.fmz-past .pg-names { flex: 1; min-width: 0; }
 .fmz-past .xi-proj { font-size: .84rem; color: var(--muted); margin: 2px 0 8px; }
 .fmz-past .xi-proj b { color: var(--accent2); }
 .pg-fv { color: var(--accent2); font-weight: 700; }
 .pg-bench { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
-.pg-bench-l { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 4px; }
-.pg-b { font-size: .82rem; display: inline-flex; align-items: center; gap: 4px; }
