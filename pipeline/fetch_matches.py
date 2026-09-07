@@ -44,12 +44,16 @@ def match_urls(g):
     return res
 
 
-def parse_match(h, g):
-    """Titolari con eventi e lato casa/trasferta. None se la partita non è giocata."""
+def parse_match(h, g, home, away):
+    """Titolari con eventi + lato casa/trasferta + punteggio. None se non giocata."""
     hh = h.find('team-lineup home"')
     ha = h.find('team-lineup away"')
     if hh < 0 or ha < 0:
         return None
+    sh = re.search(r'class="score-home[^"]*"[^>]*>\s*(\d+)', h)
+    sa = re.search(r'class="score-away[^"]*"[^>]*>\s*(\d+)', h)
+    hg = int(sh.group(1)) if sh else None
+    ag = int(sa.group(1)) if sa else None
     lo, hi = (hh, ha) if hh < ha else (ha, hh)
     home_first = hh < ha
     players = []
@@ -72,7 +76,7 @@ def parse_match(h, g):
         players.append({"fid": fid.group(1), "role": role.group(1) if role else "?", "side": side, "ev": evs})
     if not players:
         return None
-    return {"gio": g, "players": players}
+    return {"gio": g, "home": home, "away": away, "hg": hg, "ag": ag, "players": players}
 
 
 def main():
@@ -92,8 +96,12 @@ def main():
         for url, mid in urls:
             if mid in cache:
                 played_any = True; continue
+            slug = url.split("/")[-2]                 # es. "genoa-como" → home-away
+            parts = slug.split("-")
+            home = parts[0].capitalize() if len(parts) == 2 else None
+            away = parts[1].capitalize() if len(parts) == 2 else None
             try:
-                parsed = parse_match(fetch(url + "/riepilogo"), g)
+                parsed = parse_match(fetch(url + "/riepilogo"), g, home, away)
             except Exception as e:
                 print(f"  match {mid}: errore {e}"); continue
             time.sleep(0.35)
@@ -126,18 +134,31 @@ def main():
             if pl["role"] == "p" and "Gol subito" not in titles:  # portiere titolare senza gol subiti
                 a["csHome" if home else "csAway"] += 1
 
-    # fonde in giornata.json → detail[fid].match
+    # aggrega GF/GA CASA/TRASFERTA per OGNI squadra dai punteggi (forza offensiva/difensiva per sede)
+    teamStats = {}
+    blank = lambda: {"homeGP": 0, "homeGF": 0, "homeGA": 0, "awayGP": 0, "awayGF": 0, "awayGA": 0}
+    for mid, mt in cache.items():
+        h_, a_, hg, ag = mt.get("home"), mt.get("away"), mt.get("hg"), mt.get("ag")
+        if not h_ or not a_ or hg is None or ag is None:
+            continue
+        H = teamStats.setdefault(h_, blank()); A = teamStats.setdefault(a_, blank())
+        H["homeGP"] += 1; H["homeGF"] += hg; H["homeGA"] += ag
+        A["awayGP"] += 1; A["awayGF"] += ag; A["awayGA"] += hg
+
+    # fonde in giornata.json → detail[fid].match + teamStats
     data = json.load(open(GIORNATA, encoding="utf-8")) if os.path.exists(GIORNATA) else {}
     detail = data.setdefault("detail", {})
     for fid, a in agg.items():
         d = detail.setdefault(fid, {})
         d["match"] = a
+    data["teamStats"] = teamStats
     data["numMatchesCache"] = len(cache)
     json.dump(data, open(GIORNATA, "w", encoding="utf-8"), ensure_ascii=False)
 
-    print(f"partite in cache: {len(cache)} (+{fetched} nuove) · miei aggregati: {len(agg)}")
-    for fid, a in list(agg.items())[:8]:
-        print(f"  {fid}: {a['matches']} tit · uscito {a['subOff']} · CS casa {a['csHome']}/tras {a['csAway']} · pres casa {a['presHome']} tras {a['presAway']}")
+    print(f"partite in cache: {len(cache)} (+{fetched} nuove) · miei aggregati: {len(agg)} · teamStats: {len(teamStats)}")
+    for t in list(teamStats)[:4]:
+        s = teamStats[t]
+        print(f"  {t}: casa {s['homeGF']}-{s['homeGA']} ({s['homeGP']}g) · tras {s['awayGF']}-{s['awayGA']} ({s['awayGP']}g)")
 
 
 if __name__ == "__main__":

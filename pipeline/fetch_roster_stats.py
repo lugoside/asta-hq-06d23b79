@@ -78,6 +78,15 @@ def parse_player(h):
         bd[ihtml.unescape(label).strip()] = val.strip()
     # media: <span class="badge ... avg">8,25</span> <span class="small-label">MV</span> ; idem FM
     mvfm = dict((k, num(v)) for v, k in re.findall(r'class="badge[^"]*avg">([0-9.,\-]+)</span>\s*<span class="small-label">(MV|FM)</span>', h))
+    # grafico voti/giornata → sequenza FANTAVOTI delle partite giocate (secondary-value = FM),
+    # in ordine di giornata (per la FORMA recente). primary = voto, secondary = fantavoto.
+    fmSeq = []
+    gi = h.find('player-grades-graph')
+    if gi >= 0:
+        for _x, body in re.findall(r'class="item"\s+data-x="(\d+)">(.*?)</div>\s*</div>', h[gi:gi + 6000], re.S):
+            sv = re.search(r'class="secondary-value"\s+data-value="([0-9.,\-]+)"', body)
+            if sv and sv.group(1).strip():
+                fmSeq.append(num(sv.group(1)))
 
     golC, golT = split_pair(pv.get("Gol casa/trasferta", ""))
     gsC, gsT = split_pair(pv.get("Gol subiti casa/trasferta", ""))
@@ -102,6 +111,7 @@ def parse_player(h):
         "sub": sub, "subPerc": subPerc,                # subentri + %
         "squal": squal, "inf": inf, "inut": inut,
         "mv": mvfm.get("MV", 0), "fm": mvfm.get("FM", 0),
+        "fmSeq": fmSeq,                                 # fantavoti per giornata giocata (forma)
     }
 
 

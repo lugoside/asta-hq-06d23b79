@@ -105,10 +105,47 @@ def parse_probabili(teams):
     return {"fixtures": fixtures, "teamMatch": team_match, "probabili": probabili, "commento": commento}
 
 
+def calendar_fixtures():
+    """fixtures (avversario + casa/trasferta) della giornata ATTIVA dal CALENDARIO.
+    Fallback quando la pagina probabili non ha ancora le partite (tra una giornata e
+    l'altra / durante le soste): il calendario le espone sempre, con largo anticipo.
+    slug partita = 'casa-trasferta' → nomi via capitalize (set Serie A a parola singola)."""
+    base = "https://www.fantacalcio.it/serie-a/calendario"
+    h = fetch_html(base)
+    m = re.search(r'class="active"\s+href="/serie-a/calendario/(\d+)"', h)
+    if not m:
+        return [], {}
+    c = fetch_html(f"{base}/{m.group(1)}")
+    fixtures, team_match, seen = [], {}, set()
+    for slug, mid in re.findall(r'href="https://www\.fantacalcio\.it/serie-a/calendario/\d+/[0-9-]+/([a-z0-9-]+)/(\d+)"', c):
+        if mid in seen:
+            continue
+        seen.add(mid)
+        parts = slug.split("-")
+        if len(parts) != 2:
+            continue
+        home, away = parts[0].capitalize(), parts[1].capitalize()
+        fixtures.append({"matchId": mid, "home": home, "away": away})
+        team_match[home] = {"opponent": away, "home": True}
+        team_match[away] = {"opponent": home, "home": False}
+    return fixtures, team_match
+
+
 def main():
     teams = team_map()
     stats = parse_stats()
     prob = parse_probabili(teams)
+    # fallback: se i probabili non hanno ancora le partite, prendi i fixture dal calendario
+    if not prob.get("teamMatch"):
+        try:
+            fx, tm = calendar_fixtures()
+            if tm:
+                prob["teamMatch"] = tm
+                if not prob.get("fixtures"):
+                    prob["fixtures"] = fx
+                print(f"  probabili senza partite → fallback calendario: {len(tm)} squadre, {len(fx)} partite")
+        except Exception as e:
+            print(f"  fallback calendario non riuscito: {e}")
     data = {"stats": stats, **prob, "numGiocatoriStat": len(stats)}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:

@@ -82,7 +82,9 @@ jobs:
         run: python pipeline/fetch_giornata.py || echo "giornata non aggiornata (fonte non disponibile), proseguo"
       - name: Statistiche ricche della mia rosa (scrape mirato ~25 pagine-giocatore)
         run: python pipeline/fetch_roster_stats.py || echo "detail rosa non aggiornato (fonte non disponibile), proseguo"
-      - name: Dati match-by-match della mia rosa (uscite, clean sheet, casa/trasferta)
+      - name: Classifica Serie A (forza squadre per il motore Formazione)
+        run: python pipeline/fetch_classifica.py || echo "classifica non aggiornata (fonte non disponibile), proseguo"
+      - name: Dati match-by-match della mia rosa + GF/GA casa/trasferta per squadra
         run: python pipeline/fetch_matches.py || echo "match rosa non aggiornati (fonte non disponibile), proseguo"
       - name: Commit e pubblica (robusto ai race)
         run: |

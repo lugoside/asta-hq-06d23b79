@@ -25,7 +25,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v76"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v77"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -849,6 +849,52 @@ function forzaBadge(ratio) {
 
 function seasonalTitle() { return `📊 Rosa stagionale — statistiche${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}`; }
 
+// --- helper statistiche ricche CONDIVISI (Analisi rosa stagionale + card Formazione) ----
+const _n1 = (x) => (typeof x === "number" ? x : +x || 0);
+const _b = (v) => `<b>${v}</b>`;
+const _pill = (ic, v, cls) => v ? `<span class="stat-pill${cls ? " " + cls : ""}">${_b(v)} ${ic}</span>` : "";
+// split casa/trasferta con EVIDENZA opzionale al lato del turno (venue: 'home'|'away'|null)
+const _ha = (c, t, venue) => (c || t)
+  ? `<span class="ha"><span class="${venue === "home" ? "venue-hi" : ""}">${_b(c)}🏠</span> <span class="${venue === "away" ? "venue-hi" : ""}">${_b(t)}✈️</span></span>`
+  : "";
+// unisce base (stats) + ricche (detail) per un giocatore; pg/mv/fm dalla base per coerenza
+function mergeRow(p, g) {
+  const k = String(p.fantaId ?? p.id);
+  const st = (g && g.stats ? g.stats[k] : null) || null;
+  const dt = (g && g.detail ? g.detail[k] : null) || null;
+  const pg = st ? _n1(st.pg) : (dt ? _n1(dt.pgv) : 0);
+  return { p, st, dt, pg, mv: st ? _n1(st.mv) : (dt ? _n1(dt.mv) : 0), fm: st ? _n1(st.mfv) : (dt ? _n1(dt.fm) : 0) };
+}
+// riga presenze + pills statistiche per un giocatore. r = ruolo; venue = evidenza split del turno.
+function richStatBits(row, r, venue) {
+  const { st, dt, pg } = row;
+  const n1 = _n1, b = _b, pill = _pill, ha = _ha;
+  const gol = dt ? n1(dt.gol) : (st ? n1(st.gol) : 0);
+  const ass = dt ? n1(dt.ass) : (st ? n1(st.ass) : 0);
+  const gsv = dt ? n1(dt.gs) : (st ? n1(st.gs) : 0);
+  const showGs = r === "P" || r === "D";
+  const mt = dt && dt.match;
+  const cs = mt ? n1(mt.csHome) + n1(mt.csAway) : 0;
+  const assH = mt ? n1(mt.assHome) : 0, assA = mt ? n1(mt.assAway) : 0;
+  const assSplit = ass > 0 && (assH + assA) === ass;
+  const presTxt = dt
+    ? `${b(pg)} pres · ${b(n1(dt.tit))} da titolare${dt.sub ? ` · ${b(n1(dt.sub))} subentro` : ""}`
+      + `${mt && n1(mt.subOff) ? ` · ${b(n1(mt.subOff))} uscito` : ""}`
+      + `${r === "P" && mt ? ` · ${b(cs)} clean sheet${cs ? ha(n1(mt.csHome), n1(mt.csAway), venue) : ""}` : ""}`
+    : `${b(pg)} pres`;
+  const pills = [
+    gol ? `<span class="stat-pill good">${b(gol)} ⚽${dt ? ha(n1(dt.golCasa), n1(dt.golTras), venue) : ""}</span>` : "",
+    ass ? `<span class="stat-pill">${b(ass)} 🅰${assSplit ? ha(assH, assA, venue) : ""}</span>` : "",
+    showGs && gsv ? `<span class="stat-pill bad">${b(gsv)} 🥅${dt ? ha(n1(dt.gsCasa), n1(dt.gsTras), venue) : ""}</span>` : "",
+    dt && n1(dt.rp) ? pill("🧤", n1(dt.rp), "good") : "",
+    dt && n1(dt.rigTot) ? pill("🎯", `${n1(dt.rigSeg)}/${n1(dt.rigTot)}`) : "",
+    dt && n1(dt.autogol) ? pill("🔴AG", n1(dt.autogol), "bad") : "",
+    dt && n1(dt.amm) ? pill("🟨", n1(dt.amm)) : "",
+    dt && n1(dt.esp) ? pill("🟥", n1(dt.esp), "bad") : "",
+  ].join("");
+  return { presTxt, pills };
+}
+
 // Riepilogo statistiche STAGIONALI della propria rosa, per reparto (P/D/C/A).
 // Dati: giornata.json→stats (base, chiave fantaId) + giornata.json→detail (RICCHE, solo
 // mia rosa: titolare/subentro, split gol casa/trasferta, autogol, rigori, cartellini).
@@ -857,28 +903,16 @@ function seasonalRosaBlock() {
   const roster = activeRoster();
   if (!roster.length) return `<div class="an-note">La tua rosa è ancora vuota.</div>`;
   const g = giornataActive();
-  const n1 = (x) => (typeof x === "number" ? x : +x || 0);
-  // unisce base (stats) + ricche (detail); pg/mv/fm dalla base per coerenza col resto dell'app
-  const rowOf = (p) => {
-    const k = String(p.fantaId ?? p.id);
-    const st = (g && g.stats ? g.stats[k] : null) || null;
-    const dt = (g && g.detail ? g.detail[k] : null) || null;
-    const pg = st ? n1(st.pg) : (dt ? n1(dt.pgv) : 0);
-    return { p, st, dt, pg, mv: st ? n1(st.mv) : (dt ? n1(dt.mv) : 0), fm: st ? n1(st.mfv) : (dt ? n1(dt.fm) : 0) };
-  };
-  const played = roster.map(rowOf).filter((x) => x.pg > 0);
+  const n1 = _n1, b = _b;
+  const played = roster.map((p) => mergeRow(p, g)).filter((x) => x.pg > 0);
   if (!played.length) {
     return `<div class="an-note">Nessuna presenza registrata: le statistiche compaiono a campionato avviato (aggiornate in automatico). Per provare la vista ora, apri l'app con <code>?fdemo=1</code>.</div>`;
   }
   const hasDetail = played.some((x) => x.dt);
-  // stile uniforme: numero in GRASSETTO e PRIMA della descrizione/icona
-  const b = (v) => `<b>${v}</b>`;
-  const pill = (ic, v, cls) => v ? `<span class="stat-pill${cls ? " " + cls : ""}">${b(v)} ${ic}</span>` : "";
-  const ha = (c, t) => (c || t) ? `<span class="ha">${b(c)}🏠 ${b(t)}✈️</span>` : "";
 
   const reparti = ROLES.map((r) => {
     const showGs = r === "P" || r === "D";
-    const list = roster.map(rowOf).filter((x) => x.pg > 0 && x.p.ruolo === r).sort((a, b) => b.fm - a.fm);
+    const list = roster.map((p) => mergeRow(p, g)).filter((x) => x.pg > 0 && x.p.ruolo === r).sort((a, b) => b.fm - a.fm);
     if (!list.length) return "";
     // aggregati reparto: MV/FM pesate sulle presenze; somme dei bonus
     const sumPg = list.reduce((s, x) => s + x.pg, 0) || 1;
@@ -890,32 +924,10 @@ function seasonalRosaBlock() {
     const gs = sum((x) => x.dt ? n1(x.dt.gs) : (x.st ? n1(x.st.gs) : 0));
     const agg = `${b(wMv.toFixed(2))} MV · ${b(wFm.toFixed(2))} FM${gol ? ` · ${b(gol)}⚽` : ""}${ass ? ` · ${b(ass)}🅰` : ""}${showGs && gs ? ` · ${b(gs)}🥅` : ""}`;
 
-    const rows = list.map(({ p, st, dt, pg, mv, fm }) => {
-      const gol = dt ? n1(dt.gol) : (st ? n1(st.gol) : 0);
-      const ass = dt ? n1(dt.ass) : (st ? n1(st.ass) : 0);
-      const gsv = dt ? n1(dt.gs) : (st ? n1(st.gs) : 0);
-      // riga presenze: titolare/subentro/uscito + clean sheet (portiere, split casa/tras)
-      const mt = dt && dt.match;
-      const cs = mt ? n1(mt.csHome) + n1(mt.csAway) : 0;
-      // split assist casa/trasferta dal match-scrape: mostrato solo se combacia col totale canonico
-      const assH = mt ? n1(mt.assHome) : 0, assA = mt ? n1(mt.assAway) : 0;
-      const assSplit = ass > 0 && (assH + assA) === ass;
-      const presTxt = dt
-        ? `${b(pg)} pres · ${b(n1(dt.tit))} da titolare${dt.sub ? ` · ${b(n1(dt.sub))} subentro` : ""}`
-          + `${mt && n1(mt.subOff) ? ` · ${b(n1(mt.subOff))} uscito` : ""}`
-          + `${r === "P" && mt ? ` · ${b(cs)} clean sheet${cs ? ha(n1(mt.csHome), n1(mt.csAway)) : ""}` : ""}`
-        : `${b(pg)} pres`;
-      // pills: gol (+split casa/tras), assist, gs portiere (+split), rigori, parati, autogol, cartellini
-      const pills = [
-        gol ? `<span class="stat-pill good">${b(gol)} ⚽${dt ? ha(n1(dt.golCasa), n1(dt.golTras)) : ""}</span>` : "",
-        ass ? `<span class="stat-pill">${b(ass)} 🅰${assSplit ? ha(assH, assA) : ""}</span>` : "",
-        showGs && gsv ? `<span class="stat-pill bad">${b(gsv)} 🥅${dt ? ha(n1(dt.gsCasa), n1(dt.gsTras)) : ""}</span>` : "",
-        dt && n1(dt.rp) ? pill("🧤", n1(dt.rp), "good") : "",
-        dt && n1(dt.rigTot) ? pill("🎯", `${n1(dt.rigSeg)}/${n1(dt.rigTot)}`) : "",
-        dt && n1(dt.autogol) ? pill("🔴AG", n1(dt.autogol), "bad") : "",
-        dt && n1(dt.amm) ? pill("🟨", n1(dt.amm)) : "",
-        dt && n1(dt.esp) ? pill("🟥", n1(dt.esp), "bad") : "",
-      ].join("");
+    const rows = list.map((row) => {
+      const { p, mv, fm } = row;
+      // in Analisi nessuna evidenza per sede (venue = null)
+      const { presTxt, pills } = richStatBits(row, r, null);
       return `<div class="st-card">
         <div class="st-head"><span class="rp ${r}">${r}</span><span class="st-name">${esc(shortName(p.nome))} <span class="st-team">(${esc(p.squadra)})</span></span>
           <span class="st-mvfm">${b(mv.toFixed(2))} MV · ${b(fm.toFixed(2))} FM</span></div>
@@ -1357,6 +1369,14 @@ const _deac = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").to
 // nome breve per le righe compatte: i nostri nomi sono "Cognome Nome" → tengo il COGNOME
 // (anche composto, es. "De Ketelaere", "Del Prato"), scartando solo il nome di battesimo finale.
 const shortName = (n) => { const t = String(n || "").trim().split(/\s+/); return t.length > 1 ? t.slice(0, -1).join(" ") : (n || ""); };
+// sigle a 3 lettere delle squadre di Serie A (per lo scontro di giornata: SAS - mil)
+const TEAM_ABBR = {
+  Atalanta: "ATA", Bologna: "BOL", Cagliari: "CAG", Como: "COM", Fiorentina: "FIO",
+  Frosinone: "FRO", Genoa: "GEN", Inter: "INT", Juventus: "JUV", Lazio: "LAZ",
+  Lecce: "LEC", Milan: "MIL", Monza: "MON", Napoli: "NAP", Parma: "PAR",
+  Roma: "ROM", Sassuolo: "SAS", Torino: "TOR", Udinese: "UDI", Venezia: "VEN",
+};
+const teamAbbr = (name) => name ? (TEAM_ABBR[name] || _deac(name).replace(/[^a-z]/g, "").slice(0, 3).toUpperCase()) : "?";
 
 function giornataActive() { return formDemo ? formDemo.g : GIORNATA; }
 const RUOLI_NOME = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
@@ -1398,7 +1418,67 @@ function commentSnippet(nome, squadra, g) {
   const hit = frasi.find((f) => _deac(f).includes(sur));
   return hit || "";
 }
-// migliore XI sui 7 moduli: per ogni modulo prende i top per resa nei ruoli richiesti
+// --- Parametri di lega (CONFIGURABILI in un unico punto) --------------------
+// Soglie gol di squadra (inizio banda): sotto la 1ª = 0 gol. Modificatore difesa:
+// media voto (senza bonus/malus) dei migliori 3 difensori + portiere (se includeKeeper)
+// → bonus a bande; si applica solo con ≥ minDef difensori a voto.
+const FORM_CFG = {
+  goalThresholds: [66, 72, 77, 81, 85, 89, 93, 97, 101],
+  defMod: {
+    includeKeeper: true,
+    minDef: 4,
+    // [sogliaMediaVoto, bonus]; <6 = 0
+    bands: [[6, 1], [6.25, 2], [6.5, 3], [6.75, 4.5], [7, 6]],
+  },
+  // Fattori di contesto sulla resa del singolo: resa = base × disponibilità × clamp(Π(1+peso·segnale)).
+  // Segnali normalizzati ~[-1,+1]; PESI PER RUOLO (0 = neutro). Il clamp garantisce che il
+  // contesto non scavalchi mai la disponibilità (probabili). Tuning in ordine A→C→D→P.
+  factors: {
+    enabled: true,
+    clamp: 0.15,           // M ∈ [1-clamp, 1+clamp]
+    formWindow: 3,         // n° ultime partite per la forma recente
+    // ATTACCANTI (tarati 2026-09 con l'utente)
+    A: { offOpp: 0.09, offOwn: 0.09, oppStrength: 0.04, form: 0.08 },
+    // CENTROCAMPISTI (tarati 2026-09 con l'utente)
+    C: { offOpp: 0.08, offOwn: 0.08, oppStrength: 0.04, form: 0.08 },
+    // DIFENSORI (tarati 2026-09 con l'utente)
+    D: { defOwn: 0.08, defOpp: 0.08, offOpp: 0.03, offOwn: 0.02, oppStrength: 0.04, form: 0.07 },
+    // PORTIERI (tarati 2026-09 con l'utente); penSave a 0 (0 rigori + già in FM), si attiva più avanti
+    P: { defOwn: 0.10, defOpp: 0.10, oppStrength: 0.04, form: 0.06, penSave: 0 },
+  },
+};
+// medie di lega (gol segnati per partita in casa / in trasferta), memoizzate su g
+function leagueAvg(g) {
+  if (!g) return { home: 1.4, away: 1.4 };
+  if (g._lgAvg) return g._lgAvg;
+  const ts = g.teamStats || {};
+  let hGF = 0, hGP = 0, aGF = 0, aGP = 0;
+  for (const t in ts) { const s = ts[t]; hGF += s.homeGF; hGP += s.homeGP; aGF += s.awayGF; aGP += s.awayGP; }
+  return (g._lgAvg = { home: hGP ? hGF / hGP : 1.4, away: aGP ? aGF / aGP : 1.4 });
+}
+// n° gol di squadra dal punteggio totale proiettato (quante soglie superate)
+function goalsFromScore(total) {
+  let g = 0;
+  for (const t of FORM_CFG.goalThresholds) { if (total >= t) g++; else break; }
+  return g;
+}
+// voto atteso (media voto, senza bonus/malus) usato SOLO per il modificatore difesa
+function expVoto(p) { return (p._st && p._st.pg > 0 && p._st.mv) ? p._st.mv : 6.0; }
+// bonus del modificatore difesa data la lista voti dei difensori dell'XI + voto portiere
+function defenseModifier(defVotes, keeperVote) {
+  const cfg = FORM_CFG.defMod;
+  if (defVotes.length < cfg.minDef) return 0;             // servono ≥4 difensori a voto
+  const sorted = defVotes.slice().sort((a, b) => b - a);
+  const pool = cfg.includeKeeper && keeperVote != null
+    ? [...sorted.slice(0, 3), keeperVote]                 // migliori 3 dif + portiere
+    : sorted.slice(0, 4);                                 // migliori 4 dif (portiere escluso)
+  const avg = pool.reduce((s, v) => s + v, 0) / pool.length;
+  let bonus = 0;
+  for (const [th, b] of cfg.bands) { if (avg >= th) bonus = b; }
+  return bonus;
+}
+// migliore XI sui 7 moduli: massimizza il PUNTEGGIO DI SQUADRA proiettato = somma rese
+// (Σ fantavoti attesi) + modificatore difesa; espone anche i gol proiettati (soglie).
 function bestXI(players) {
   const byRole = { P: [], D: [], C: [], A: [] };
   players.forEach((p) => (byRole[p.ruolo] || (byRole[p.ruolo] = [])).push(p));
@@ -1406,11 +1486,77 @@ function bestXI(players) {
   let best = null;
   for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
     if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
-    const xi = [byRole.P[0], ...byRole.D.slice(0, nd), ...byRole.C.slice(0, nc), ...byRole.A.slice(0, na)];
-    const tot = xi.reduce((s, p) => s + p._exp, 0);
-    if (!best || tot > best.tot) best = { mod, tot, xi };
+    const keeper = byRole.P[0];
+    const defs = byRole.D.slice(0, nd);
+    const xi = [keeper, ...defs, ...byRole.C.slice(0, nc), ...byRole.A.slice(0, na)];
+    const teamFV = xi.reduce((s, p) => s + p._exp, 0);          // Σ fantavoti attesi
+    const defMod = defenseModifier(defs.map(expVoto), expVoto(keeper));
+    const total = teamFV + defMod;                              // punteggio squadra proiettato
+    const goals = goalsFromScore(total);
+    if (!best || total > best.total) best = { mod, xi, teamFV, defMod, total, goals };
   }
   return best;
+}
+
+// Ingredienti GREZZI dei fattori di contesto per un giocatore (dal prossimo turno +
+// classifica + teamStats casa/trasferta). Il mapping in moltiplicatore si tara insieme.
+// Ritorna null se non c'è il turno/i dati.
+function teamCtx(p, g) {
+  const tm = g && g.teamMatch ? g.teamMatch[p.squadra] : null;
+  if (!tm) return null;
+  const cl = g.classifica || {}, ts = g.teamStats || {};
+  const own = ts[p.squadra] || {}, opp = ts[tm.opponent] || {};
+  const rate = (gp, v) => gp ? +(v / gp).toFixed(2) : null;
+  const home = !!tm.home;
+  return {
+    venue: home ? "home" : "away",
+    opp: tm.opponent,
+    oppRank: (cl[tm.opponent] || {}).rank || null,
+    ownRank: (cl[p.squadra] || {}).rank || null,
+    // difensivi (P/D): gol subiti attesi = quanto la MIA squadra subisce nella sede +
+    // quanto l'avversario segna nella SUA sede
+    ownGApg: home ? rate(own.homeGP, own.homeGA) : rate(own.awayGP, own.awayGA),
+    oppGFpg: home ? rate(opp.awayGP, opp.awayGF) : rate(opp.homeGP, opp.homeGF),
+    // offensivi (D/C/A): gol/assist attesi = quanto l'avversario subisce nella SUA sede +
+    // quanto la MIA squadra segna nella sede
+    oppGApg: home ? rate(opp.awayGP, opp.awayGA) : rate(opp.homeGP, opp.homeGA),
+    ownGFpg: home ? rate(own.homeGP, own.homeGF) : rate(own.awayGP, own.awayGF),
+  };
+}
+// Moltiplicatore di contesto sulla resa del singolo. IMPALCATURA NEUTRA: con
+// FORM_CFG.factors.enabled=false (default) ritorna 1.0 → l'11 non cambia. Il mapping
+// segnali→moltiplicatore e i pesi si definiscono nella fase di tuning (con ok utente).
+function contextMult(p, g) {
+  const F = FORM_CFG.factors;
+  if (!F.enabled) return 1;
+  const w = F[p.ruolo], c = p._ctx;
+  if (!w || !c) return 1;
+  const lg = leagueAvg(g);
+  // due riferimenti: media gol SEGNATI nella sede (offensivi) e media gol SUBITI nella sede
+  // (difensivi = gol segnati dalla parte opposta) → normalizzazione corretta per ciascun segnale
+  const refScore = c.venue === "home" ? lg.home : lg.away;
+  const refConc = c.venue === "home" ? lg.away : lg.home;
+  const cl = (x) => Math.max(-1, Math.min(1, x));
+  let m = 1;
+  // offensivi (gol/assist attesi): difesa avversaria debole + attacco proprio forte → +
+  if (w.offOpp && c.oppGApg != null && refScore) m *= 1 + w.offOpp * cl(c.oppGApg / refScore - 1);
+  if (w.offOwn && c.ownGFpg != null && refScore) m *= 1 + w.offOwn * cl(c.ownGFpg / refScore - 1);
+  // difensivi (P/D): pochi gol subiti attesi → + (segno negativo perché "meno è meglio")
+  if (w.defOwn && c.ownGApg != null && refConc) m *= 1 - w.defOwn * cl(c.ownGApg / refConc - 1);
+  if (w.defOpp && c.oppGFpg != null && refConc) m *= 1 - w.defOpp * cl(c.oppGFpg / refConc - 1);
+  // forza avversario (classifica): avversario in bassa classifica → +
+  if (w.oppStrength && c.oppRank) m *= 1 + w.oppStrength * ((c.oppRank - 10.5) / 9.5);
+  // forma recente: media ultime N fantavoti vs FM stagionale
+  if (w.form) {
+    const dt = g.detail ? g.detail[String(p.fantaId ?? p.id)] : null;
+    if (dt && dt.fmSeq && dt.fmSeq.length && dt.fm) {
+      const seq = dt.fmSeq.slice(-(F.formWindow || 4));
+      const recent = seq.reduce((a, b) => a + b, 0) / seq.length;
+      m *= 1 + w.form * cl(recent / dt.fm - 1);
+    }
+  }
+  const k = F.clamp || 0.15;
+  return Math.max(1 - k, Math.min(1 + k, m));
 }
 
 function renderFormazione() {
@@ -1439,7 +1585,8 @@ function renderFormazione() {
     p._st = (g.stats || {})[k] || null;
     p._prob = (g.probabili || {})[k] || null;
     p._match = (g.teamMatch || {})[p.squadra] || null;
-    p._exp = expScore(p._st, p._prob, p.infortunato);
+    p._ctx = teamCtx(p, g);                                   // ingredienti grezzi dei fattori
+    p._exp = expScore(p._st, p._prob, p.infortunato) * contextMult(p, g);
     p._lab = labelFor(p._prob, p.infortunato);
     p._note = commentSnippet(p.nome, p.squadra, g);
   });
@@ -1457,8 +1604,10 @@ function renderFormazione() {
       <div class="xi-top"><b>Panchina consigliata</b> <span class="meta">(per ruolo · ordine di subentro)</span></div>
       ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
     </div>` : "";
+    const projTxt = `punteggio <b>${xi.total.toFixed(1)}</b>${xi.defMod ? ` <span class="meta">(+${xi.defMod} dif)</span>` : ""} · <b>${xi.goals}</b> gol proiettati`;
     xiHtml = `<div class="fmz-xi">
-      <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b> <span class="meta">(resa attesa ${xi.tot.toFixed(1)})</span></div>
+      <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b></div>
+      <div class="xi-proj">${projTxt}</div>
       ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
       ${benchHtml}
     </div>`;
@@ -1479,15 +1628,23 @@ function renderFormazione() {
     const probTxt = p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
       : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟡"} titolare ${perc}` : `⚪ riserva ${perc} (subentro)`)
       : "⚪ non tra i probabili";
-    const club = esc(String(p.squadra).toUpperCase());  // club del giocatore in MAIUSCOLO
-    // sempre "Casa - Trasferta": se il club gioca fuori, prima l'avversario (casa) poi il club
-    const matchTxt = m ? (m.home ? `${club} - ${esc(m.opponent)} 🏠` : `${esc(m.opponent)} - ${club} ✈️`) : club;
-    const fmt = (n) => (typeof n === "number" ? n.toFixed(2) : (n || 0));
-    const statTxt = st ? `${st.pg} pres · MV ${fmt(st.mv)} · FM ${fmt(st.mfv)} · ${st.gol} gol${st.gs ? ` · ${st.gs} subiti` : ""}${st.ass ? ` · ${st.ass} assist` : ""}` : "nessuna statistica";
-    return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}">
-      <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(p.nome)}</span><span class="fc-team">${matchTxt}</span>${inXI ? `<span class="xi-badge">11</span>` : ""}</div>
+    // scontro di giornata: sigla della SUA squadra in MAIUSCOLO grassetto, avversario minuscolo,
+    // nell'ordine reale casa–trasferta (grassetto a sinistra = gioca in casa, a destra = fuori)
+    const own = `<b>${esc(teamAbbr(p.squadra))}</b>`;
+    const opp = m ? esc(teamAbbr(m.opponent).toLowerCase()) : "";
+    const matchTxt = m ? (m.home ? `${own} - ${opp}` : `${opp} - ${own}`) : own;
+    // stesse statistiche ricche della tab Analisi, con EVIDENZA allo split casa/trasferta
+    // del turno: 🏠 se gioca in casa, ✈️ se in trasferta
+    const venue = m ? (m.home ? "home" : "away") : null;
+    const row = mergeRow(p, g);
+    const { presTxt, pills } = richStatBits(row, p.ruolo, venue);
+    const mvfm = row.pg > 0 ? `${_b(row.mv.toFixed(2))} MV · ${_b(row.fm.toFixed(2))} FM` : "";
+    const statTxt = row.pg > 0 ? `${mvfm} · ${presTxt}` : "nessuna statistica";
+    return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}${venue ? " has-venue" : ""}">
+      <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(shortName(p.nome))}</span><span class="fc-team">${matchTxt}</span>${inXI ? `<span class="xi-badge">11</span>` : ""}</div>
       <div class="fc-prob">${probTxt}</div>
       <div class="fc-stat">${statTxt}</div>
+      ${pills ? `<div class="st-pills">${pills}</div>` : ""}
       ${p._note ? `<div class="fc-note">💬 ${esc(p._note)}</div>` : ""}
     </div>`;
   }
