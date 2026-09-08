@@ -280,6 +280,14 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 .st-line { font-size: .8rem; color: var(--muted); margin: 4px 0 0 30px; }
 .st-line b { color: var(--text); }
 .st-pills { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 0 30px; }
+/* confronto quotazioni (Qa crediti + FVM): fotografia asta 03/09 -> attuale, differenza col segno */
+.st-qa { font-size: .78rem; color: var(--muted); margin: 6px 0 0 30px; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.st-qa b { color: var(--text); }
+.qa-metric { white-space: nowrap; }
+.qa-metric .qa-delta { font-weight: 700; margin-left: 3px; padding: 1px 6px; border-radius: 6px; background: var(--card2); }
+.qa-metric.up .qa-delta { color: var(--verde); }
+.qa-metric.down .qa-delta { color: var(--rosso); }
+.qa-metric.flat .qa-delta { color: var(--muted); font-weight: 600; }
 .ha { font-size: .82em; opacity: .85; margin-left: 5px; font-weight: 600; }
 /* Formazione con turno noto: tutti i numeri smorzati/neutri, risalta SOLO il numero
    del lato (casa/trasferta) della prossima giornata → colpo d'occhio immediato. */
@@ -420,3 +428,12 @@ nav.tabs button.on { color: var(--accent2); }
 .pg-bench { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 /* gruppo di alternative pari-voto nell'11 ideale (A / B, intercambiabili) */
 .fmz-past .pg-alt { font-style: italic; }
+
+/* --- Formazione: 3 categorie comprimibili (passata · consigliata · dettaglio rosa) --- */
+/* le categorie prendono l'inset laterale (14px); i blocchi interni non lo ri-applicano */
+#formazioneBody > .an-sec { margin: 16px 14px 0; }
+#formazioneBody .fmz-past,
+#formazioneBody .fmz-xi { margin-left: 0; margin-right: 0; }
+/* sotto-sezioni per ruolo dentro "Dettaglio calciatori": compatte, senza doppio inset */
+#formazioneBody .an-sec .an-sec { margin-top: 12px; }
+#formazioneBody .an-sec .an-sec .fmz-reparto { margin: 6px 0 0; }

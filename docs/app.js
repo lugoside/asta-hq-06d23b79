@@ -14,6 +14,7 @@ const LS = {
   discreet: "fa_discreet", // modalità discreta (aspetto LITE, consigli nascosti a colpo d'occhio)
   showtabs: "fa_showtabs", // schede avanzate Analisi/Formazione visibili
   anCollapsed: "fa_an_collapsed", // stato comprimi/espandi delle sezioni della tab Analisi
+  qaAsta: "fa_qa_asta_cache", // fotografia Qa (crediti) al giorno dell'asta 03/09 (baseline fisso)
 };
 // Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
 // i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
@@ -25,7 +26,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v85"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v86"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -117,6 +118,9 @@ let FAVORITES = new Set(load(LS.fav, []));  // preferiti: SOLO locali (personali
 let PLAYERS = [];
 let META = {};
 let GIORNATA = load(LS.giornata, null);   // dati di giornata (statistiche + probabili + fixtures), da fetch_giornata.py
+const _asta0 = load(LS.qaAsta, null) || {};             // fotografia asta 03/09 (baseline fisso)
+let QA_ASTA = _asta0.qa || {};                           // {fantaId: Qa al 03/09}
+let FVM_ASTA = _asta0.fvm || {};                         // {fantaId: FVM al 03/09}
 let formDemo = null;                       // dataset DEMO (rosa+stat casuali) per provare la Formazione senza toccare la lega vera
 let BOARD = null;
 let selectedId = null;
@@ -542,6 +546,11 @@ async function loadData(forceNetwork = false) {
     ]);
     PLAYERS = pj; META = mj;
     save(LS.players, pj); save(LS.meta, mj);
+    // fotografia Qa al giorno dell'asta (03/09): file STATICO, baseline fisso; non blocca se assente
+    try {
+      const qj = await fetch(`data/qa_asta.json${bust}`, { cache: forceNetwork ? "reload" : "default" }).then((r) => r.ok ? r.json() : null);
+      if (qj && qj.qa) { QA_ASTA = qj.qa; FVM_ASTA = qj.fvm || {}; save(LS.qaAsta, qj); }
+    } catch { /* baseline asta non disponibile: il confronto quotazione semplicemente non compare */ }
     // dati di giornata (opzionali: presenti solo a stagione avviata); non bloccano se assenti
     try {
       const gj = await fetch(`data/giornata.json${bust}`, { cache: forceNetwork ? "reload" : "default" }).then((r) => r.ok ? r.json() : null);
@@ -895,6 +904,26 @@ function richStatBits(row, r, venue) {
   return { presTxt, pills };
 }
 
+// Confronto QUOTAZIONI: fotografia del giorno dell'asta (03/09, baseline fisso) vs attuale,
+// sia per Qa (crediti) sia per FVM (fanta valore di mercato). Serve a leggere svalutazioni/
+// rivalutazioni in vista del mercato di riparazione (giù = poco spazio/infortunio/rendimento
+// sotto le attese; su = sopra le attese). Differenza col segno: + verde, − rosso.
+function _astaMetric(label, base, now) {
+  if (base == null || now == null) return "";
+  const d = now - base;
+  const cls = d > 0 ? "up" : d < 0 ? "down" : "flat";
+  const delta = d === 0 ? "=" : `${d > 0 ? "+" : "−"}${Math.abs(d)}`;
+  return `<span class="qa-metric ${cls}">${label} <b>${base}</b>→<b>${now}</b> <span class="qa-delta">${delta}</span></span>`;
+}
+function qaTrendBits(p) {
+  const k = String(p.fantaId ?? p.id);
+  const pl = PLAYERS.find((x) => String(x.fantaId) === k);
+  const qa = _astaMetric("💰 Qa", QA_ASTA[k], pl ? pl.qa : p.qa);
+  const fvm = _astaMetric("📈 FVM", FVM_ASTA[k], pl ? pl.fvm : p.fvm);
+  if (!qa && !fvm) return "";
+  return `<div class="st-qa"><span class="meta">asta→oggi</span> ${qa} ${fvm}</div>`;
+}
+
 // Riepilogo statistiche STAGIONALI della propria rosa, per reparto (P/D/C/A).
 // Dati: giornata.json→stats (base, chiave fantaId) + giornata.json→detail (RICCHE, solo
 // mia rosa: titolare/subentro, split gol casa/trasferta, autogol, rigori, cartellini).
@@ -933,6 +962,7 @@ function seasonalRosaBlock() {
           <span class="st-mvfm">${b(mv.toFixed(2))} MV · ${b(fm.toFixed(2))} FM</span></div>
         <div class="st-line">${presTxt}</div>
         ${pills ? `<div class="st-pills">${pills}</div>` : ""}
+        ${qaTrendBits(p)}
       </div>`;
     }).join("");
     return `<div class="an-statrep">
@@ -941,9 +971,10 @@ function seasonalRosaBlock() {
     </div>`;
   }).join("");
 
+  const qaLeg = Object.keys(QA_ASTA).length ? ` · 💰 <b>Qa</b> (crediti) e 📈 <b>FVM</b> dal giorno dell'asta (03/09) → attuale, con la differenza (verde = rivalutato, rosso = svalutato)` : "";
   const legenda = hasDetail
-    ? `<div class="an-hint-sm">🏠 casa · ✈️ trasferta · 🎯 rigori segnati/tirati · 🧤 rigori parati · 🔴AG autogol · <b>uscito</b> = sostituito a gara in corso · <b>clean sheet</b> = porta inviolata (portiere titolare). Statistiche ricche solo per la tua rosa.</div>`
-    : `<div class="an-hint-sm">Statistiche di base (le statistiche ricche — titolare/subentro, split casa/trasferta — si vedono con i dati reali della tua rosa).</div>`;
+    ? `<div class="an-hint-sm">🏠 casa · ✈️ trasferta · 🎯 rigori segnati/tirati · 🧤 rigori parati · 🔴AG autogol · <b>uscito</b> = sostituito a gara in corso · <b>clean sheet</b> = porta inviolata (portiere titolare)${qaLeg}. Statistiche ricche solo per la tua rosa.</div>`
+    : `<div class="an-hint-sm">Statistiche di base (le statistiche ricche — titolare/subentro, split casa/trasferta — si vedono con i dati reali della tua rosa)${qaLeg}.</div>`;
   return reparti + legenda;
 }
 
@@ -1686,7 +1717,9 @@ function renderFormazione() {
 
   // in uso normale nessun pulsante demo; se la demo è attiva (via URL) mostro solo l'uscita
   const demoBtn = formDemo ? `<button class="btn ghost on" data-formdemo="1">🧪 Esci dalla demo</button>` : "";
-  const head = `<div class="fmz-head"><div class="section-title">🧩 Formazione di giornata${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}</div>${demoBtn}</div>`;
+  // titolo unico usato SOLO negli stati vuoti (rosa vuota / dati assenti); nel render normale
+  // ci sono invece 3 sezioni comprimibili con i propri titoli.
+  const head = `<div class="fmz-head"><div class="section-title">🧩 Formazione${formDemo ? ` <span class="demo-badge">DEMO</span>` : ""}</div>${demoBtn}</div>`;
 
   if (!roster.length) {
     el.innerHTML = head + `<div class="hint" style="margin-top:12px">La tua rosa è ancora vuota: la <b>Formazione</b> si popola dopo l'asta (con la tua rosa) e a campionato iniziato, con i dati di giornata aggiornati automaticamente.</div>`;
@@ -1740,7 +1773,7 @@ function renderFormazione() {
     const updated = fmtLastData(g && g.aggiornato);
     const rinvioXi = xi.xi.filter((p) => p._rinvio6).map((p) => esc(shortName(p.nome)));
     xiHtml = `<div class="fmz-xi">
-      <div class="xi-top"><b>11 consigliato</b> · modulo <b>${xi.mod}</b></div>
+      <div class="xi-top">Modulo <b>${xi.mod}</b></div>
       <div class="xi-proj">${projTxt}</div>
       ${updated ? `<div class="fmz-updated">🕒 Ultimo dato: <b>${updated}</b></div>` : ""}
       ${rinvioXi.length ? `<div class="fmz-rinvio">🔁 In lista col <b>6 politico</b> (gara rinviata): ${rinvioXi.join(", ")}</div>` : ""}
@@ -1750,14 +1783,20 @@ function renderFormazione() {
   }
 
   const ord = { go: 0, maybe: 1, no: 2 };
+  // ogni reparto (P/D/C/A) è una SOTTO-sezione comprimibile dentro "Dettaglio calciatori della rosa"
   const reparti = ROLES.map((r) => {
     const list = roster.filter((p) => p.ruolo === r).sort((a, b) => ord[a._lab.k] - ord[b._lab.k] || b._exp - a._exp);
     if (!list.length) return "";
-    return `<div class="fmz-reparto"><div class="rep-title"><span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}</div>${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
+    const body = `<div class="fmz-reparto">${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
+    return anSection("fmz_rosa_" + r, `<span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}`, body);
   }).join("");
 
-  // ordine: 11 giornata passata → 11 consigliato (futura) → lista estesa per giocatore
-  el.innerHTML = head + pastGiornataBlock(roster, g) + xiHtml + reparti;
+  // 3 categorie comprimibili: giornata passata → consigliata → dettaglio rosa (con sotto-sezioni per ruolo)
+  const demoStrip = formDemo ? `<div class="fmz-head"><span class="demo-badge">DEMO</span>${demoBtn}</div>` : "";
+  el.innerHTML = demoStrip
+    + anSection("fmz_past", "🏆 Formazione migliore giornata passata", pastGiornataBlock(roster, g))
+    + anSection("fmz_cons", "🧩 Formazione consigliata", xiHtml)
+    + anSection("fmz_rosa", "📋 Dettaglio calciatori della rosa", reparti);
 
   function card(p, inXI) {
     const st = p._st, pr = p._prob, m = p._match;
