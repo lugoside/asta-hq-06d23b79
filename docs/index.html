@@ -104,15 +104,25 @@
         <div class="hint" id="metaInfo"></div>
         <div class="hint" id="sourcesInfo" style="margin-top:8px"></div>
         <button class="btn me full" id="refreshData">🔄 Aggiorna dati</button>
-        <a class="btn ghost full" id="forceSource"
-           href="https://github.com/lugoside/fantaasta/actions/workflows/update-data.yml"
-           target="_blank" rel="noopener"
-           style="margin-top:8px; display:block; text-align:center; text-decoration:none">⚡ Forza aggiornamento dalla fonte</a>
+        <button class="btn ghost full" id="forceSource" style="margin-top:8px">⚡ Scarica ora dalle fonti</button>
         <div class="hint" style="margin-top:8px">
-          <b>🔄 Aggiorna dati</b>: riscarica l'ultimo listone pubblicato (veloce, quello di tutti i giorni).<br>
-          Il listone si rigenera <b>da solo</b> più volte al giorno sotto asta.<br>
-          <b>⚡ Forza</b>: apre GitHub → tocca <b>«Run workflow»</b>, aspetta ~1 min, poi tocca 🔄. Serve solo se vuoi ripescare i dati <i>adesso</i> tra un aggiornamento automatico e l'altro.
+          <b>🔄 Aggiorna dati</b>: riscarica l'ultimo listone <b>già pubblicato</b> (veloce, quello di tutti i giorni). Non riscarica dalle fonti: è solo l'ultima versione generata dalle run automatiche.<br>
+          I dati si rigenerano <b>da soli</b>: quotazioni/statistiche il giorno dopo ogni giornata (02:00 e 12:00), probabili in avvicinamento al turno + 2 volte al giorno negli altri giorni.<br>
+          <b>⚡ Scarica ora</b>: fa girare gli scraper <i>adesso</i> su GitHub e ricarica da solo quando è pronto (~2-3 min). Serve solo se ti servono i dati freschi fuori dagli orari automatici. Richiede il token qui sotto (una volta sola).
         </div>
+        <details class="gh-tok" style="margin-top:8px">
+          <summary class="hint" style="cursor:pointer">🔑 Token GitHub per ⚡ (configura una volta)</summary>
+          <div class="hint" id="ghTokenStatus" style="margin:6px 0"></div>
+          <input id="ghToken" type="password" placeholder="Incolla il token (github_pat_…)" autocomplete="off" style="width:100%; box-sizing:border-box">
+          <div style="display:flex; gap:8px; margin-top:6px">
+            <button class="btn ghost" id="ghTokenSave">Salva token</button>
+            <button class="btn ghost" id="ghTokenClear">Rimuovi</button>
+          </div>
+          <div class="hint" style="margin-top:6px">
+            Crea un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>: <b>Repository access</b> → solo <b>asta-hq-06d23b79</b>; <b>Permissions → Repository → Actions: Read and write</b>. Nient'altro. Resta salvato solo su questo dispositivo (mai nel codice né nel repo).<br>
+            In alternativa, senza token: <a href="https://github.com/lugoside/asta-hq-06d23b79/actions/workflows/update-data.yml" target="_blank" rel="noopener">apri GitHub → «Run workflow»</a> a mano, poi tocca 🔄.
+          </div>
+        </details>
         <button class="btn ghost full" id="forceApp" style="margin-top:10px">🆕 Forza aggiornamento app</button>
         <div class="hint" style="margin-top:6px">Se non vedi le ultime novità dell'app: azzera la cache e ricarica l'ultima versione.</div>
       </div>

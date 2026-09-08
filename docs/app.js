@@ -15,6 +15,7 @@ const LS = {
   showtabs: "fa_showtabs", // schede avanzate Analisi/Formazione visibili
   anCollapsed: "fa_an_collapsed", // stato comprimi/espandi delle sezioni della tab Analisi
   qaAsta: "fa_qa_asta_cache", // fotografia Qa (crediti) al giorno dell'asta 03/09 (baseline fisso)
+  ghToken: "fa_gh_token", // PAT fine-grained per avviare lo scrape on-demand (solo su questo dispositivo)
 };
 // Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
 // i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
@@ -26,7 +27,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v86"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v87"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -560,6 +561,74 @@ async function loadData(forceNetwork = false) {
     PLAYERS = load(LS.players, []); META = load(LS.meta, {});
     if (!PLAYERS.length) throw e;
     toast("Offline: uso l'ultimo listone salvato");
+  }
+}
+
+// --- Scrape ON-DEMAND: avvia il workflow GitHub (stesso delle run automatiche) e ricarica ---
+// Gratis (repo pubblico → Actions illimitate). Il token fine-grained (Actions: RW su questo
+// repo) sta SOLO nel localStorage del dispositivo, mai nel codice/repo.
+const GH_REPO = "lugoside/asta-hq-06d23b79";
+const GH_WF = "update-data.yml";
+const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function ghTokenStatus() {
+  const el = document.getElementById("ghTokenStatus");
+  if (!el) return;
+  const t = load(LS.ghToken, "");
+  el.innerHTML = t
+    ? `✅ Token salvato (…${esc(String(t).slice(-4))}). Il pulsante ⚡ è pronto.`
+    : `⚠️ Nessun token: ⚡ non può partire finché non lo aggiungi.`;
+}
+async function dispatchScrape(btn) {
+  const tok = load(LS.ghToken, "");
+  if (!tok) {
+    toast("Aggiungi prima il token GitHub (🔑 qui sotto)");
+    const d = document.querySelector(".gh-tok"); if (d) d.open = true;
+    return;
+  }
+  const api = `https://api.github.com/repos/${GH_REPO}`;
+  const H = { "Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  const orig = "⚡ Scarica ora dalle fonti";
+  const set = (t) => { if (btn) btn.textContent = t; };
+  if (btn) btn.disabled = true;
+  try {
+    set("🚀 Avvio scrape…");
+    const since = Date.now() - 90000; // margine per riconoscere la run nuova
+    const disp = await fetch(`${api}/actions/workflows/${GH_WF}/dispatches`, { method: "POST", headers: H, body: JSON.stringify({ ref: "main" }) });
+    if (disp.status !== 204) {
+      const msg = disp.status === 401 ? "token non valido/scaduto"
+        : disp.status === 403 ? "permessi insufficienti (serve Actions: Read and write)"
+        : disp.status === 404 ? "repo/workflow non raggiungibile col token"
+        : "errore " + disp.status;
+      toast("⚡ Scrape non avviato: " + msg); return;
+    }
+    set("⏳ In coda su GitHub…");
+    let runId = null;
+    for (let i = 0; i < 12 && !runId; i++) {
+      await _sleep(3000);
+      const r = await fetch(`${api}/actions/workflows/${GH_WF}/runs?event=workflow_dispatch&per_page=5`, { headers: H });
+      const j = await r.json().catch(() => ({}));
+      const cand = (j.workflow_runs || []).find((w) => new Date(w.created_at).getTime() >= since);
+      if (cand) runId = cand.id;
+    }
+    if (!runId) { toast("Run avviata: controlla su GitHub, poi tocca 🔄"); return; }
+    for (let i = 0; i < 80; i++) { // ~fino a 6-7 min
+      await _sleep(5000);
+      const w = await fetch(`${api}/actions/runs/${runId}`, { headers: H }).then((r) => r.json()).catch(() => ({}));
+      set(`⏳ Scraping… (${w.status || "…"})`);
+      if (w.status === "completed") {
+        if (w.conclusion !== "success") { toast(`⚡ Scrape terminato: ${w.conclusion || "errore"}`); return; }
+        set("⏳ Pubblico i dati…");
+        await _sleep(20000); // attesa redeploy di GitHub Pages dopo il commit
+        await loadData(true); recompute(); renderAll();
+        toast("✅ Dati aggiornati dalla fonte");
+        return;
+      }
+    }
+    toast("Scrape ancora in corso: riprova col 🔄 tra poco");
+  } catch {
+    toast("⚡ Errore di rete durante lo scrape");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 }
 
@@ -2038,6 +2107,15 @@ function wire() {
     catch { toast("Aggiornamento fallito"); }
     e.target.textContent = "🔄 Aggiorna dati"; renderAll();
   });
+  // ⚡ scrape on-demand + gestione token GitHub (solo su questo dispositivo)
+  document.getElementById("forceSource")?.addEventListener("click", (e) => dispatchScrape(e.currentTarget));
+  document.getElementById("ghTokenSave")?.addEventListener("click", () => {
+    const inp = document.getElementById("ghToken"); const v = (inp?.value || "").trim();
+    if (!v) { toast("Incolla il token prima di salvare"); return; }
+    save(LS.ghToken, v); if (inp) inp.value = ""; ghTokenStatus(); toast("Token salvato su questo dispositivo");
+  });
+  document.getElementById("ghTokenClear")?.addEventListener("click", () => { save(LS.ghToken, ""); ghTokenStatus(); toast("Token rimosso"); });
+  ghTokenStatus();
   document.getElementById("budgetPerTeam").addEventListener("change", (e) => {
     const v = Math.round(Number(e.target.value));
     if (!v || v < 1) { e.target.value = CONFIG.budgetPerTeam; return; } // valore non valido → ripristina
