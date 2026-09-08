@@ -70,7 +70,9 @@ def parse_probabili(teams):
     h = fetch_html(PROB_URL)
     # fixtures: match casa|trasferta
     fixtures, team_match = [], {}
-    for mid, home, away in re.findall(r'data-match-id="(\d+)"\s+data-teams-id="(\d+)\|(\d+)"', h):
+    # ⚠️ tra data-match-id e data-teams-id il sito ora inserisce data-match-hash → [^>]*?
+    # (tollerante ad attributi extra, senza uscire dal tag <li>).
+    for mid, home, away in re.findall(r'data-match-id="(\d+)"[^>]*?\bdata-teams-id="(\d+)\|(\d+)"', h):
         hn, an = teams.get(home, home), teams.get(away, away)
         fixtures.append({"matchId": mid, "home": hn, "away": an})
         team_match[hn] = {"opponent": an, "home": True}
@@ -143,7 +145,7 @@ def main():
                 prob["teamMatch"] = tm
                 if not prob.get("fixtures"):
                     prob["fixtures"] = fx
-                print(f"  probabili senza partite → fallback calendario: {len(tm)} squadre, {len(fx)} partite")
+                print(f"  probabili senza partite -> fallback calendario: {len(tm)} squadre, {len(fx)} partite")
         except Exception as e:
             print(f"  fallback calendario non riuscito: {e}")
     # MERGE nel giornata.json esistente: aggiorna stats/probabili/teamMatch/fixtures/commento

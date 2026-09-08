@@ -133,7 +133,7 @@ def main():
                 tm[a] = {"opponent": h, "home": False}
             if tm:
                 data["teamMatch"] = tm
-                print(f"  turno attivo {G} già concluso → preparo la {upcoming}: teamMatch dal calendario ({len(tm) // 2} partite)")
+                print(f"  turno attivo {G} gia' concluso -> preparo la {upcoming}: teamMatch dal calendario ({len(tm) // 2} partite)")
         except Exception as e:
             print(f"  rebuild teamMatch per {upcoming} non riuscito: {e}")
 
@@ -141,7 +141,7 @@ def main():
     data["rinvii"] = rinvii
     data["lastFullGiornata"] = last_full
     json.dump(data, open(GIORNATA, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"giornata corrente {upcoming} (attiva sito {G}) · lastFullGiornata {last_full} · rinvii-oltre: {rinvii or 'nessuno'}")
+    print(f"giornata corrente {upcoming} (attiva sito {G}) | lastFullGiornata {last_full} | rinvii-oltre: {rinvii or 'nessuno'}")
 
 
 if __name__ == "__main__":
