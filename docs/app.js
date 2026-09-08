@@ -27,7 +27,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v87"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v88"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -973,6 +973,20 @@ function richStatBits(row, r, venue) {
   return { presTxt, pills };
 }
 
+// Riga difensiva di SQUADRA (solo P/D) per la card Formazione: gol subiti per partita in
+// casa/trasferta, con evidenza al lato del turno. Una difesa che subisce poco alza le
+// chance di voto pieno / clean sheet → è il contesto che pesa sul modificatore e sui fattori.
+function teamDefLine(p, g, venue) {
+  if (p.ruolo !== "P" && p.ruolo !== "D") return "";
+  const ts = (g && g.teamStats ? g.teamStats[p.squadra] : null);
+  if (!ts) return "";
+  const pg = (gp, ga) => gp ? (ga / gp).toFixed(1) : "–";
+  const gpn = (gp) => gp ? ` <span class="meta">(${gp})</span>` : "";
+  const h = pg(ts.homeGP, ts.homeGA), a = pg(ts.awayGP, ts.awayGA);
+  const side = (s, val, gp, ic) => `<span class="${venue === s ? "venue-hi" : ""}">${_b(val)}${ic}${gpn(gp)}</span>`;
+  return `<div class="fc-teamdef">🛡️ ${esc(p.squadra)} subisce ${side("home", h, ts.homeGP, "🏠")} · ${side("away", a, ts.awayGP, "✈️")} <span class="meta">gol/gara</span></div>`;
+}
+
 // Confronto QUOTAZIONI: fotografia del giorno dell'asta (03/09, baseline fisso) vs attuale,
 // sia per Qa (crediti) sia per FVM (fanta valore di mercato). Serve a leggere svalutazioni/
 // rivalutazioni in vista del mercato di riparazione (giù = poco spazio/infortunio/rendimento
@@ -1558,16 +1572,32 @@ const FORM_CFG = {
     enabled: true,
     clamp: 0.15,           // M ∈ [1-clamp, 1+clamp]
     formWindow: 3,         // n° ultime partite per la forma recente
+    rampGiornate: 8,       // il contesto entra gradualmente: pieno solo dall'8ª giornata giocata
     // ATTACCANTI (tarati 2026-09 con l'utente)
-    A: { offOpp: 0.09, offOwn: 0.09, oppStrength: 0.04, form: 0.08 },
+    A: { offOpp: 0.09, offOwn: 0.09, oppStrength: 0.05, form: 0.08 },
     // CENTROCAMPISTI (tarati 2026-09 con l'utente)
-    C: { offOpp: 0.08, offOwn: 0.08, oppStrength: 0.04, form: 0.08 },
+    C: { offOpp: 0.08, offOwn: 0.08, oppStrength: 0.05, form: 0.08 },
     // DIFENSORI (tarati 2026-09 con l'utente)
-    D: { defOwn: 0.08, defOpp: 0.08, offOpp: 0.03, offOwn: 0.02, oppStrength: 0.04, form: 0.07 },
+    D: { defOwn: 0.08, defOpp: 0.08, offOpp: 0.03, offOwn: 0.02, oppStrength: 0.05, form: 0.07 },
     // PORTIERI (tarati 2026-09 con l'utente); penSave a 0 (0 rigori + già in FM), si attiva più avanti
-    P: { defOwn: 0.10, defOpp: 0.10, oppStrength: 0.04, form: 0.06, penSave: 0 },
+    P: { defOwn: 0.10, defOpp: 0.10, oppStrength: 0.05, form: 0.06, penSave: 0 },
   },
 };
+// rank per PUNTI con parità (pari punti = pari forza): 1 + n° squadre con più punti.
+// Memoizzato su g. Sostituisce il rank secco, che spaccava i pari-punti per differenza reti
+// (es. Roma/Inter/Lazio a punteggio pieno = stessa "forza 1", non 1°/2°/3°).
+function ptsRankMap(g) {
+  if (!g) return {};
+  if (g._ptsRank) return g._ptsRank;
+  const cl = g.classifica || {}, map = {};
+  for (const t in cl) {
+    const p = cl[t].pts;
+    if (p == null) { map[t] = cl[t].rank || null; continue; }
+    let above = 0; for (const u in cl) if ((cl[u].pts || 0) > p) above++;
+    map[t] = above + 1;
+  }
+  return (g._ptsRank = map);
+}
 // medie di lega (gol segnati per partita in casa / in trasferta), memoizzate su g
 function leagueAvg(g) {
   if (!g) return { home: 1.4, away: 1.4 };
@@ -1602,10 +1632,51 @@ function defenseModifier(defVotes, keeperVote) {
 // P(gioca)×FV del titolare + (1−P)×[copertura], dove la copertura è la prima riserva dello
 // STESSO RUOLO in panchina (le riserve più forti coprono i titolari più a rischio). Il totale
 // (Σ slot + modificatore difesa) è il punteggio-squadra atteso → gol proiettati via soglie.
+const COVER_MARGIN = 0.75; // la selezione "audace" (cover-aware) sostituisce quella per-resa
+// solo se guadagna almeno questo → non si flippa un titolare su differenze da rumore.
+// 0.75 = compromesso (taglia i rischi marginali, tiene le scommesse chiaramente convenienti);
+// da rivedere caso per caso nelle prime giornate.
+// valore-slot di un set di titolari con SOSTITUZIONE AUTOMATICA: i titolari più a rischio
+// (P più basso) sono coperti dalle riserve di ruolo migliori (bench ord. per _exp desc).
+function slotValue(starters, bench) {
+  const risky = starters.slice().sort((a, b) => a._pPlay - b._pPlay);
+  let v = 0;
+  risky.forEach((s, k) => { const c = bench[k]; v += s._pPlay * s._fv + (1 - s._pPlay) * (c ? c._exp : 0); });
+  return v;
+}
+function kCombinations(n, k) {
+  const res = [], cur = [];
+  const go = (start) => {
+    if (cur.length === k) { res.push(cur.slice()); return; }
+    for (let i = start; i < n; i++) { cur.push(i); go(i + 1); cur.pop(); }
+  };
+  go(0); return res;
+}
+// migliore selezione di n titolari di un reparto, CONSAPEVOLE DELLA COPERTURA: valuta ogni
+// combinazione col valore-slot (auto-sub) e adotta quella "audace" solo se batte la selezione
+// per-resa di COVER_MARGIN → un high-ceiling a rischio (es. 60%) coperto da un titolare certo
+// può rendere più della scelta prudente, senza però flippare su differenze da rumore.
+function bestRole(pool, n) {
+  if (pool.length <= n) return { starters: pool.slice(), value: pool.reduce((s, x) => s + x._pPlay * x._fv, 0) };
+  const byExp = pool.slice().sort((a, b) => b._exp - a._exp);
+  const set0 = byExp.slice(0, n), v0 = slotValue(set0, byExp.slice(n));   // selezione prudente (per resa)
+  let best = { starters: set0, value: v0 };
+  for (const combo of kCombinations(pool.length, n)) {
+    const chosen = new Set(combo);
+    const starters = combo.map((i) => pool[i]);
+    const bench = pool.filter((_, i) => !chosen.has(i)).sort((a, b) => b._exp - a._exp);
+    const v = slotValue(starters, bench);
+    if (v > best.value) best = { starters, value: v };
+  }
+  return (best.value - v0 >= COVER_MARGIN) ? best : { starters: set0, value: v0 };
+}
+// migliore XI sui 7 moduli: ogni reparto scelto con bestRole (cover-aware), il totale
+// (Σ valori-slot + modificatore difesa) → gol proiettati via soglie.
 function bestXI(players) {
   const byRole = { P: [], D: [], C: [], A: [] };
   players.forEach((p) => (byRole[p.ruolo] || (byRole[p.ruolo] = [])).push(p));
-  for (const r of ROLES) byRole[r].sort((a, b) => b._exp - a._exp);
+  const cache = {};
+  const roleSel = (r, n) => cache[r + n] || (cache[r + n] = bestRole(byRole[r] || [], n));
   let best = null;
   for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
     if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
@@ -1613,18 +1684,12 @@ function bestXI(players) {
     const xi = [], defs = [];
     let total = 0;
     for (const r of ROLES) {
-      const starters = byRole[r].slice(0, need[r]);
-      const bench = byRole[r].slice(need[r]);
-      // le riserve migliori (bench[], già ordinate per resa) coprono i titolari più a rischio
-      const risky = starters.map((s) => s).sort((a, b) => a._pPlay - b._pPlay);
-      risky.forEach((s, k) => {
-        const cover = bench[k];
-        total += s._pPlay * s._fv + (1 - s._pPlay) * (cover ? cover._exp : 0);
-      });
-      xi.push(...starters);
-      if (r === "D") defs.push(...starters);
+      const sel = roleSel(r, need[r]);
+      total += sel.value;
+      xi.push(...sel.starters);
+      if (r === "D") defs.push(...sel.starters);
     }
-    const defMod = defenseModifier(defs.map(expVoto), expVoto(byRole.P[0]));
+    const defMod = defenseModifier(defs.map(expVoto), expVoto(roleSel("P", 1).starters[0]));
     total += defMod;
     const goals = goalsFromScore(total);
     if (!best || total > best.total) best = { mod, xi, defMod, total, goals };
@@ -1640,21 +1705,28 @@ function teamCtx(p, g) {
   if (!tm) return null;
   const cl = g.classifica || {}, ts = g.teamStats || {};
   const own = ts[p.squadra] || {}, opp = ts[tm.opponent] || {};
-  const rate = (gp, v) => gp ? +(v / gp).toFixed(2) : null;
   const home = !!tm.home;
+  // rate per-gara della sede voluta, con FALLBACK all'aggregato (casa+trasferta) se la
+  // squadra non ha ancora giocato in quella sede → il fattore non sparisce per dato mancante
+  // (es. avversario che non ha ancora giocato in casa). Si auto-affina col crescere delle gare.
+  const rV = (gpV, vV, s, key) => {
+    if (gpV) return +(vV / gpV).toFixed(2);
+    const gpAll = (s.homeGP || 0) + (s.awayGP || 0);
+    return gpAll ? +(((s["home" + key] || 0) + (s["away" + key] || 0)) / gpAll).toFixed(2) : null;
+  };
   return {
     venue: home ? "home" : "away",
     opp: tm.opponent,
-    oppRank: (cl[tm.opponent] || {}).rank || null,
-    ownRank: (cl[p.squadra] || {}).rank || null,
+    oppRank: ptsRankMap(g)[tm.opponent] || null,
+    ownRank: ptsRankMap(g)[p.squadra] || null,
     // difensivi (P/D): gol subiti attesi = quanto la MIA squadra subisce nella sede +
     // quanto l'avversario segna nella SUA sede
-    ownGApg: home ? rate(own.homeGP, own.homeGA) : rate(own.awayGP, own.awayGA),
-    oppGFpg: home ? rate(opp.awayGP, opp.awayGF) : rate(opp.homeGP, opp.homeGF),
+    ownGApg: home ? rV(own.homeGP, own.homeGA, own, "GA") : rV(own.awayGP, own.awayGA, own, "GA"),
+    oppGFpg: home ? rV(opp.awayGP, opp.awayGF, opp, "GF") : rV(opp.homeGP, opp.homeGF, opp, "GF"),
     // offensivi (D/C/A): gol/assist attesi = quanto l'avversario subisce nella SUA sede +
     // quanto la MIA squadra segna nella sede
-    oppGApg: home ? rate(opp.awayGP, opp.awayGA) : rate(opp.homeGP, opp.homeGA),
-    ownGFpg: home ? rate(own.homeGP, own.homeGF) : rate(own.awayGP, own.awayGF),
+    oppGApg: home ? rV(opp.awayGP, opp.awayGA, opp, "GA") : rV(opp.homeGP, opp.homeGA, opp, "GA"),
+    ownGFpg: home ? rV(own.homeGP, own.homeGF, own, "GF") : rV(own.awayGP, own.awayGF, own, "GF"),
   };
 }
 // Moltiplicatore di contesto sulla resa del singolo. IMPALCATURA NEUTRA: con
@@ -1671,8 +1743,12 @@ function contextMult(p, g, parts) {
   const refScore = c.venue === "home" ? lg.home : lg.away;   // media gol segnati @sede
   const refConc = c.venue === "home" ? lg.away : lg.home;    // media gol subiti @sede
   const cl = (x) => Math.max(-1, Math.min(1, x));
+  // SMORZAMENTO graduale a inizio stagione: i dati casa/trasferta girano su pochi match
+  // (es. GA di una squadra su 1 sola gara casalinga) → ballerini. Il contesto entra al
+  // (giornate_giocate / rampGiornate), pieno dalla rampGiornate in poi (verso l'inverno).
+  const ramp = Math.min(1, (g.lastFullGiornata || 0) / (F.rampGiornate || 6));
   let m = 1;
-  const add = (lbl, delta) => { if (delta) { m *= 1 + delta; if (parts) parts.push([lbl, delta]); } };
+  const add = (lbl, delta) => { const d = delta * ramp; if (d) { m *= 1 + d; if (parts) parts.push([lbl, d]); } };
   // offensivi (gol/assist attesi): difesa avversaria debole + attacco proprio forte → +
   if (w.offOpp && c.oppGApg != null && refScore) add("dif.avv", w.offOpp * cl(c.oppGApg / refScore - 1));
   if (w.offOwn && c.ownGFpg != null && refScore) add("att.pro", w.offOwn * cl(c.ownGFpg / refScore - 1));
@@ -1895,6 +1971,7 @@ function renderFormazione() {
       <div class="fc-prob">${probTxt}</div>
       <div class="fc-stat">${statTxt}</div>
       ${pills ? `<div class="st-pills">${pills}</div>` : ""}
+      ${teamDefLine(p, g, venue)}
       <div class="fc-calc">${calcTxt}</div>
       ${p._note ? `<div class="fc-note">💬 ${esc(p._note)}</div>` : ""}
     </div>`;

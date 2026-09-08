@@ -296,6 +296,10 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 .fmz-card.has-venue .stat-pill b { color: var(--muted); font-weight: 600; }
 .fmz-card.has-venue .ha { opacity: 1; }
 .fmz-card.has-venue .venue-hi b { color: #39ff14; font-weight: 800; }
+/* riga difensiva di squadra (gol subiti casa/trasferta) per P/D */
+.fc-teamdef { font-size: .76rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.fc-teamdef b { color: var(--text); }
+.fmz-card.has-venue .fc-teamdef, .fmz-card.has-venue .fc-teamdef b { color: var(--muted); font-weight: 600; }
 /* Sezioni Analisi comprimibili/espandibili */
 .an-sec { margin-top: 16px; }
 .an-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px 2px; text-align: left; }
