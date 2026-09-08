@@ -118,11 +118,30 @@ def main():
         if played + oltre_n >= 10 and N > last_full:
             last_full = N
 
-    data["giornataCorrente"] = G
+    # Il marker "active" del sito resta sulla giornata appena CONCLUSA finché non parte la
+    # successiva (tra un turno e l'altro): se la corrente è già completa, il turno da
+    # PREPARARE è last_full+1. Senza questa riconciliazione l'app mostrerebbe come "prossimo
+    # turno" partite GIÀ giocate (teamMatch preso dal calendario del turno attivo lagging).
+    upcoming = last_full + 1 if last_full >= G else G
+    if upcoming != G:
+        try:
+            tm = {}
+            for slug, h, a, dt in _raw(upcoming):
+                if slug in active_slugs:          # scarta il widget del turno attivo
+                    continue
+                tm[h] = {"opponent": a, "home": True}
+                tm[a] = {"opponent": h, "home": False}
+            if tm:
+                data["teamMatch"] = tm
+                print(f"  turno attivo {G} già concluso → preparo la {upcoming}: teamMatch dal calendario ({len(tm) // 2} partite)")
+        except Exception as e:
+            print(f"  rebuild teamMatch per {upcoming} non riuscito: {e}")
+
+    data["giornataCorrente"] = upcoming
     data["rinvii"] = rinvii
     data["lastFullGiornata"] = last_full
     json.dump(data, open(GIORNATA, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"giornata corrente {G} · lastFullGiornata {last_full} · rinvii-oltre: {rinvii or 'nessuno'}")
+    print(f"giornata corrente {upcoming} (attiva sito {G}) · lastFullGiornata {last_full} · rinvii-oltre: {rinvii or 'nessuno'}")
 
 
 if __name__ == "__main__":
