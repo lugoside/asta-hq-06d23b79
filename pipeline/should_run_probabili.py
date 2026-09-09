@@ -6,7 +6,7 @@ Vogliamo catturare i probabili aggiornati prima di schierare la formazione:
   - il GIORNO PRIMA della 1ª partita del turno -> ogni ~3 ore (09-21 IT)
   - il GIORNO della 1ª partita -> ogni ~2 ore, fino a ~1-2 ore prima del calcio d'inizio
     (ultima run all'ora intera compresa fra 1h e 2h prima del kickoff)
-  - TUTTI GLI ALTRI GIORNI (metà settimana) -> 2 refresh/giorno (mattina/sera), così le
+  - TUTTI GLI ALTRI GIORNI (metà settimana) -> 3 refresh/giorno (09/13/18), così le
     probabili che si muovono a inizio settimana (es. un titolare promosso) non restano ferme
 
 Il kickoff della 1ª gara del turno si legge dal CALENDARIO della giornata attiva
@@ -26,7 +26,7 @@ except Exception:
     TZ = None
 
 DAY_BEFORE_HOURS = (9, 12, 15, 18, 21)   # giorno prima: ogni 3h
-OTHER_DAYS_HOURS = (9, 18)               # altri giorni (fuori avvicinamento): 2 refresh/giorno
+OTHER_DAYS_HOURS = (9, 13, 18)           # altri giorni (fuori avvicinamento): 3 refresh/giorno
 
 
 def fetch(u):
