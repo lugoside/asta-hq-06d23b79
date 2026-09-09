@@ -81,6 +81,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Installa dipendenze
         run: pip install -r pipeline/requirements.txt
       - name: Quotazioni ufficiali fantacalcio.it (id reali, QUOT, FVM)
@@ -107,12 +110,29 @@ jobs:
         run: python pipeline/fetch_matches.py || echo "match rosa non aggiornati (fonte non disponibile), proseguo"
       - name: Posticipi/sospensioni (6 politico regola lega) + raffina giornata completa
         run: python pipeline/fetch_rinvii.py || echo "rinvii non calcolati (fonte non disponibile), proseguo"
+      - id: notify
+        name: Rileva novità sulla rosa (probabili + infortuni + impatto 11)
+        run: node pipeline/notify.mjs || echo "notify non riuscito, proseguo"
+      - name: Email novità rosa (solo se ci sono cambiamenti; salta senza secret SMTP)
+        if: steps.notify.outputs.send == 'true'
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: FantaAsta <${{ secrets.SMTP_USERNAME }}>
+          to: lugoside@gmail.com
+          subject: ${{ steps.notify.outputs.subject }}
+          body: file://pipeline/notify_body.txt
       - name: Commit e pubblica (robusto ai race)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json pipeline/matches_cache.json
+            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json pipeline/matches_cache.json pipeline/notify_state.json
             if git diff --cached --quiet; then
               echo "Nessuna variazione nei dati."; exit 0
             fi
@@ -128,6 +148,7 @@ jobs:
             python pipeline/fetch_goal_formazioni.py || echo "goal.com non aggiornato (retry), proseguo"
             python pipeline/build_listone_fanta.py
             python pipeline/build_players.py
+            node pipeline/notify.mjs || echo "notify (retry) non riuscito, proseguo"
           done
           echo "Impossibile pubblicare dopo 5 tentativi."; exit 1
       # Genera i dati RIDOTTI e li pubblica nel repo LITE (serve il secret LITE_REPO_TOKEN).
@@ -175,22 +196,44 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Aggiorna SOLO i probabili di giornata (merge, preserva i dati del motore)
         run: python pipeline/fetch_giornata.py || echo "probabili non aggiornati (fonte non disponibile), proseguo"
+      - name: Indisponibili/infortunati (intercetta nuovi infortuni + prognosi anche mid-week)
+        run: python pipeline/fetch_indisponibili.py || echo "indisponibili non aggiornati, proseguo"
       - name: Rinvii/6 politico (tiene fresca la regola posticipi anche in settimana)
         run: python pipeline/fetch_rinvii.py || echo "rinvii non calcolati, proseguo"
-      - name: Commit probabili
+      - id: notify
+        name: Rileva novità sulla rosa (probabili + infortuni + impatto 11)
+        run: node pipeline/notify.mjs || echo "notify non riuscito, proseguo"
+      - name: Email novità rosa (solo se ci sono cambiamenti; salta senza secret SMTP)
+        if: steps.notify.outputs.send == 'true'
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: FantaAsta <${{ secrets.SMTP_USERNAME }}>
+          to: lugoside@gmail.com
+          subject: ${{ steps.notify.outputs.subject }}
+          body: file://pipeline/notify_body.txt
+      - name: Commit probabili + stato notifiche
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/giornata.json
+          git add docs/data/giornata.json pipeline/notify_state.json
           if git diff --cached --quiet; then
-            echo "Probabili invariati: niente da pubblicare."; exit 0
+            echo "Nulla da pubblicare."; exit 0
           fi
-          git commit -m "chore: aggiorna probabili di giornata [skip ci]"
+          git commit -m "chore: aggiorna probabili/notifiche [skip ci]"
           for i in 1 2 3; do
-            if git push; then echo "Probabili pubblicati (tentativo $i)."; exit 0; fi
+            if git push; then echo "Pubblicato (tentativo $i)."; exit 0; fi
             echo "Push rifiutato: riallineo (tentativo $i)…"
             git pull --rebase --autostash origin main || true
           done
-          echo "Push probabili non riuscito dopo 3 tentativi."; exit 1
+          echo "Push non riuscito dopo 3 tentativi."; exit 1
