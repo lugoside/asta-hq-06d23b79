@@ -1,14 +1,14 @@
 {
-  "aggiornato": "2026-09-09T07:22:56+00:00",
-  "fonteAggiornata": "09/09/2026",
+  "aggiornato": "2026-09-10T07:01:34+00:00",
+  "fonteAggiornata": "10/09/2026",
   "sources": {
     "Listone": {
       "fp": "4d9d069d2287",
       "lastChanged": "2026-09-08T14:17:58+00:00"
     },
     "Infortuni": {
-      "fp": "19053b0f5344",
-      "lastChanged": "2026-09-09T07:22:56+00:00"
+      "fp": "b60663758559",
+      "lastChanged": "2026-09-10T07:01:34+00:00"
     },
     "Formazioni": {
       "fp": "cf131b659e78",
@@ -19,14 +19,14 @@
       "lastChanged": "2026-09-08T09:00:06+00:00"
     },
     "Corner": {
-      "fp": "9c92548403df",
-      "lastChanged": "2026-09-09T07:22:56+00:00"
+      "fp": "d958a0dd4493",
+      "lastChanged": "2026-09-10T07:01:34+00:00"
     }
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",
   "isDemo": false,
   "numGiocatori": 537,
-  "numInfortunati": 51,
+  "numInfortunati": 55,
   "numFormazioni": 347,
   "consensoFormazioni": {
     "tit": 255,
