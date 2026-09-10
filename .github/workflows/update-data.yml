@@ -22,19 +22,20 @@ on:
     #  - 02:00 IT: prende SUBITO di notte la giornata appena chiusa (consuntivo/statistiche/match).
     #  - 12:00 IT: intercetta l'aggiornamento settimanale delle QUOTAZIONI (Qa/FVM), che
     #              fantacalcio.it pubblica in giornata e a mezzanotte ancora manca.
+    # Tutti i cron partono a :49 (11 min PRIMA dell'ora tonda) per EVITARE il :00, che è
+    # l'orario più congestionato → i cron di GitHub :00 ritardano/saltano molto più spesso.
     # Mappatura UTC (nei giorni a cavallo del cambio d'ora ±1h: irrilevante, decide il gate):
-    #   estate (CEST, UTC+2), mesi 3-10  → 00:00=02:00 IT · 10:00=12:00 IT
-    #   inverno (CET,  UTC+1), mesi 11-2 → 01:00=02:00 IT · 11:00=12:00 IT
-    # NB: il cron di GitHub è best-effort (può ritardare di ore). Giro immediato: avvio manuale
-    # (Setup → ⚡ o "Run workflow"), che salta il gate ed esegue sempre.
-    - cron: "0 0 * 3-10 *"        # FULL post-giornata, estate (02:00 IT)
-    - cron: "0 1 * 1,2,11,12 *"   # FULL post-giornata, inverno (02:00 IT)
-    - cron: "0 10 * 3-10 *"       # FULL post-giornata, estate (12:00 IT)
-    - cron: "0 11 * 1,2,11,12 *"  # FULL post-giornata, inverno (12:00 IT)
-    # PROBABILI: ogni ora nella finestra diurna (07-20 UTC ≈ 08/09-21/22 IT). Il gate
-    # should_run_probabili esegue davvero solo negli slot voluti (giorno prima ogni 3h;
-    # giorno-gara ogni 2h fino a ~1-2h prima del calcio d'inizio della 1ª partita del turno).
-    - cron: "0 7-20 * * *"
+    #   estate (CEST, UTC+2), mesi 3-10  → 23:49=01:49 IT · 09:49=11:49 IT
+    #   inverno (CET,  UTC+1), mesi 11-2 → 00:49=01:49 IT · 10:49=11:49 IT
+    # NB: il cron di GitHub resta best-effort; l'⚡ manuale (Setup) è il piano B garantito.
+    - cron: "49 23 * 3-10 *"      # FULL post-giornata, estate (~01:49 IT, era 02:00)
+    - cron: "49 0 * 1,2,11,12 *"  # FULL post-giornata, inverno (~01:49 IT, era 02:00)
+    - cron: "49 9 * 3-10 *"       # FULL post-giornata, estate (~11:49 IT, era 12:00)
+    - cron: "49 10 * 1,2,11,12 *" # FULL post-giornata, inverno (~11:49 IT, era 12:00)
+    # PROBABILI: ogni ora a :49 nella finestra diurna (06-19 UTC ≈ ~08:49-21:49 IT). Il gate
+    # should_run_probabili arrotonda all'ora intesa ed esegue solo negli slot voluti (giorno
+    # prima ogni 3h; giorno-gara ogni 2h fino a ~1-2h prima del calcio d'inizio della 1ª partita).
+    - cron: "49 6-19 * * *"
 
 permissions:
   contents: write
@@ -51,13 +52,13 @@ jobs:
   # GATE: decide se stanotte serve aggiornare (giorno dopo l'ultima partita di una giornata).
   # Sul workflow_dispatch (avvio manuale) forza sempre l'esecuzione.
   gate:
-    # solo sui cron FULL delle 02:00/12:00 (o su avvio manuale), NON sul cron orario probabili
+    # solo sui cron FULL (~01:49/~11:49, o su avvio manuale), NON sul cron orario probabili
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.schedule == '0 0 * 3-10 *' ||
-      github.event.schedule == '0 1 * 1,2,11,12 *' ||
-      github.event.schedule == '0 10 * 3-10 *' ||
-      github.event.schedule == '0 11 * 1,2,11,12 *'
+      github.event.schedule == '49 23 * 3-10 *' ||
+      github.event.schedule == '49 0 * 1,2,11,12 *' ||
+      github.event.schedule == '49 9 * 3-10 *' ||
+      github.event.schedule == '49 10 * 1,2,11,12 *'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
@@ -175,7 +176,7 @@ jobs:
   # --- PROBABILI: aggiornamento LEGGERO e frequente (solo fetch_giornata in MERGE) ---
   # Gira sul cron orario; il gate esegue davvero solo negli slot di avvicinamento al turno.
   probabili-gate:
-    if: github.event.schedule == '0 7-20 * * *'
+    if: github.event.schedule == '49 6-19 * * *'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}

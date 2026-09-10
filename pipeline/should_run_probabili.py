@@ -56,18 +56,22 @@ def decide():
     if not ko:
         return False, "kickoff non determinato"
     now = datetime.datetime.now(TZ) if TZ else datetime.datetime.now()
+    # i cron partono a HH:49 (11 min PRIMA dell'ora tonda, per evitare il :00 congestionato):
+    # arrotondo all'ora "intesa" (08:49 -> 9) così le fasce restano in ore piene e leggibili,
+    # ed è tollerante ai ritardi (fino a ~:29 dell'ora dopo cade ancora nella stessa fascia).
+    H = now.hour + (1 if now.minute >= 30 else 0)
     day_before = ko.date() - datetime.timedelta(days=1)
     if now.date() == day_before:
-        run = now.hour in DAY_BEFORE_HOURS
-        return run, f"giorno prima ({day_before}) ora {now.hour} -> {'RUN' if run else 'skip'}"
+        run = H in DAY_BEFORE_HOURS
+        return run, f"giorno prima ({day_before}) ora ~{H} -> {'RUN' if run else 'skip'}"
     if now.date() == ko.date() and now < ko:
         last = (ko - datetime.timedelta(hours=1)).hour   # ultima slot: ora intera 1-2h prima del kickoff
         slots = set(range(last, 8, -2))                  # last, last-2, … (>=9)
-        run = now.hour in slots
-        return run, f"giorno gara ora {now.hour}, kickoff {ko.strftime('%H:%M')}, ultima slot {last} -> {'RUN' if run else 'skip'}"
-    # tutti gli altri giorni (metà settimana, o giorno-gara dopo il kickoff): 2 refresh/giorno
-    run = now.hour in OTHER_DAYS_HOURS
-    return run, f"altri giorni (kickoff {ko.isoformat()}) ora {now.hour} -> {'RUN' if run else 'skip'}"
+        run = H in slots
+        return run, f"giorno gara ora ~{H}, kickoff {ko.strftime('%H:%M')}, ultima slot {last} -> {'RUN' if run else 'skip'}"
+    # tutti gli altri giorni (metà settimana, o giorno-gara dopo il kickoff): 3 refresh/giorno
+    run = H in OTHER_DAYS_HOURS
+    return run, f"altri giorni (kickoff {ko.isoformat()}) ora ~{H} -> {'RUN' if run else 'skip'}"
 
 
 def main():
