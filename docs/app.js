@@ -16,6 +16,7 @@ const LS = {
   anCollapsed: "fa_an_collapsed", // stato comprimi/espandi delle sezioni della tab Analisi
   qaAsta: "fa_qa_asta_cache", // fotografia Qa (crediti) al giorno dell'asta 03/09 (baseline fisso)
   ghToken: "fa_gh_token", // PAT fine-grained per avviare lo scrape on-demand (solo su questo dispositivo)
+  fmzView: "fa_fmz_view", // vista tab Formazione: "pulita" (resa se gioca) | "consigliato" (con disponibilità)
 };
 // Gate master (deterrente contro chi indovina l'URL della FULL). SOFT: il repo è pubblico,
 // i dati grezzi restano tecnicamente accessibili a un esperto; la password ferma lo sbirbo casuale.
@@ -27,7 +28,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v88"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v89"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1520,22 +1521,18 @@ function activeRoster() {
   });
 }
 
-// resa attesa: fantamedia (se ci sono partite) o media di ruolo, moderata dalla disponibilità
-// P(il giocatore prende voto) — titolare: perc; riserva: prob. di subentro; non-probabile: 0.15; infortunato: 0
-function pPlay(st, prob, injured) {
-  if (injured) return 0;
-  if (!prob) return 0.15;
-  if (prob.status === "titolare") return (prob.perc ?? 70) / 100;
-  return (prob.perc ?? 0) / 100;
-}
-// FV atteso SE gioca — titolare/non-prob: FM stagionale; riserva: cameo bonus-aware (voto + parte del bonus/gara)
-function fvIfPlays(st, prob, injured) {
-  if (injured) return 0;
-  const base = (st && st.pg > 0 && st.mfv) ? st.mfv : 6.0;
-  if (!prob || prob.status === "titolare") return base;
-  const sub = FORM_CFG.sub || { base: 6.0, bonusW: 0.5 };
-  const bonusRate = (st && st.pg > 0 && st.mfv && st.mv) ? Math.max(0, st.mfv - st.mv) : 0;
-  return sub.base + sub.bonusW * bonusRate;
+// FATTORE DISPONIBILITÀ per la vista "11 consigliato": moltiplica la resa pulita. Casi 1-5
+// (vedi FORM_CFG). Ballottaggio: start(own) + subentro(coppia)×cameoRatio, cappato; riserva pura:
+// subentro cappato; titolare puro: % lineare (no cap); infortunato/out: 0.
+function availFactor(p, g) {
+  if (p.infortunato) return 0;                                    // caso 5
+  const CAP = FORM_CFG.availCap ?? 0.85, CAMEO = FORM_CFG.cameoRatio ?? 0.5;
+  const b = g && g.ballottaggi ? g.ballottaggi[String(p.fantaId ?? p.id)] : null;
+  if (b) return Math.min(CAP, (b.start || 0) / 100 + ((b.sub || 0) / 100) * CAMEO);   // casi 2/3
+  const pr = p._prob;
+  if (!pr) return 0.15;                                           // non tra i probabili (dato assente)
+  if (pr.status === "titolare") return (pr.perc ?? 70) / 100;     // caso 1 (no cap)
+  return Math.min(CAP, (pr.perc ?? 0) / 100);                     // caso 4 (riserva pura, cappata)
 }
 function labelFor(prob, injured) {
   if (injured) return { t: "Panchina", k: "no" };
@@ -1557,8 +1554,21 @@ function commentSnippet(nome, squadra, g) {
 // → bonus a bande; si applica solo con ≥ minDef difensori a voto.
 const FORM_CFG = {
   goalThresholds: [66, 72, 77, 81, 85, 89, 93, 97, 101],
-  // valore del SUBENTRANTE (riserva): P(subentro) × (base + bonusW × bonus/gara)
-  sub: { base: 6.0, bonusW: 0.5 },
+  // FM casa/trasferta per la RESA PULITA: media pesata PER NUMERO DI GARE tra la FM complessiva
+  // (peso = gare totali N) e la FM della sede del turno (peso = gare-di-sede × venuePeso).
+  //   fmVenue = (overall·N + fmSede·(nSede·venuePeso)) / (N + nSede·venuePeso)
+  // venuePeso 1 = pura media per gare; >1 = la sede conta di più (simmetrico: più penalità dove
+  // rende meno, più premio dove rende di più). Se 0 gare nella sede → usa l'overall. Tarato con l'utente.
+  venuePeso: 1.25,
+  // DISPONIBILITÀ (vista "11 consigliato"): resa = resa_pulita × fattore. Fattore per caso:
+  //  1) titolare no-ball.: %                (lineare, NON cappato)
+  //  2) titolare in ball.: start + subCoppia×cameoRatio   (cappato)
+  //  3) riserva in ball.:  start + subentro×cameoRatio     (cappato)
+  //  4) riserva no-ball.:  subentro                         (cappato)
+  //  5) indisponibile/squalificato/non convocato: 0
+  // cap su 2/3/4 → un ballottaggio non supera mai un titolare quasi-certo (risolve il paradosso).
+  cameoRatio: 0.5,   // il cameo da subentrante vale metà di una gara intera
+  availCap: 0.85,    // tetto ai casi con calcolo (2/3/4)
   defMod: {
     includeKeeper: true,
     minDef: 4,
@@ -1729,6 +1739,21 @@ function teamCtx(p, g) {
     ownGFpg: home ? rV(own.homeGP, own.homeGF, own, "GF") : rV(own.awayGP, own.awayGF, own, "GF"),
   };
 }
+// FM pesata per SEDE (casa/trasferta) del turno, per la resa pulita. Fonde la FM di sede
+// (detail.fmHome/fmAway) con la FM complessiva, con shrinkage sul piccolo campione: poche gare
+// in quella sede → resta vicino alla FM complessiva. venue = 'home'|'away'|null.
+function fmVenue(p, g, venue) {
+  const dt = g && g.detail ? g.detail[String(p.fantaId ?? p.id)] : null;
+  const st = p._st;
+  const overall = (dt && dt.fm) ? dt.fm : (st && st.pg > 0 && st.mfv ? st.mfv : 6.0);
+  if (!dt || !venue) return overall;
+  const fmS = venue === "home" ? dt.fmHome : dt.fmAway;
+  const nS = (venue === "home" ? dt.nHome : dt.nAway) || 0;
+  if (fmS == null || !nS) return overall;                   // 0 gare in quella sede → overall
+  const N = (dt.nHome || 0) + (dt.nAway || 0);              // gare totali (peso dell'overall)
+  const wS = nS * (FORM_CFG.venuePeso ?? 1.25);             // peso della sede (gare-di-sede × venuePeso)
+  return (overall * N + fmS * wS) / (N + wS);
+}
 // Moltiplicatore di contesto sulla resa del singolo. IMPALCATURA NEUTRA: con
 // FORM_CFG.factors.enabled=false (default) ritorna 1.0 → l'11 non cambia. Il mapping
 // segnali→moltiplicatore e i pesi si definiscono nella fase di tuning (con ok utente).
@@ -1887,15 +1912,22 @@ function renderFormazione() {
     p._rinvio6 = !p.infortunato && rinviate.has(p.squadra);   // gara rinviata-oltre → 6 politico garantito
     if (p._rinvio6) {
       // 6 politico: voto certo 6, nessun bonus/malus, nessun contesto; prende sempre voto
-      p._pPlay = 1; p._fvBase = 6; p._ctxMult = 1; p._ctxParts = []; p._fv = 6; p._exp = 6;
+      p._ctxMult = 1; p._ctxParts = []; p._bal = null;
+      p._fmVenue = 6; p._resaPulita = 6;                       // resa pulita = 6 fisso
+      p._availFactor = 1; p._pPlay = 1; p._fv = 6; p._exp = 6; // con disponibilità = 6
       p._lab = { t: "6 politico", k: "maybe" };
     } else {
-      p._pPlay = pPlay(p._st, p._prob, p.infortunato);        // P(prende voto)
-      p._fvBase = fvIfPlays(p._st, p._prob, p.infortunato);   // FV se gioca (senza contesto)
       p._ctxParts = [];
       p._ctxMult = contextMult(p, g, p._ctxParts);            // moltiplicatore contesto + scomposizione
-      p._fv = p._fvBase * p._ctxMult;                         // FV se gioca (con contesto)
-      p._exp = p._pPlay * p._fv;                              // resa attesa da sola
+      // RESA PULITA (vista "resa pulita"): FM pesata per sede × contesto, senza disponibilità
+      p._fmVenue = fmVenue(p, g, p._match ? (p._match.home ? "home" : "away") : null);
+      p._resaPulita = p._fmVenue * p._ctxMult;
+      // DISPONIBILITÀ (vista "11 consigliato"): resa = resa_pulita × fattore
+      p._bal = (g.ballottaggi || {})[k] || null;              // per la chip in card
+      p._availFactor = availFactor(p, g);
+      p._pPlay = p._availFactor;                              // per la selezione cover-aware
+      p._fv = p._resaPulita;                                  // valore se gioca (pieno)
+      p._exp = p._availFactor * p._resaPulita;
       p._lab = labelFor(p._prob, p.infortunato);
     }
     p._note = commentSnippet(p.nome, p.squadra, g);
@@ -1927,28 +1959,40 @@ function renderFormazione() {
     </div>`;
   }
 
+  // VISTA: "pulita" (resa se gioca, ordina per valore puro) | "consigliato" (con disponibilità)
+  const view = load(LS.fmzView, "pulita");
   const ord = { go: 0, maybe: 1, no: 2 };
   // ogni reparto (P/D/C/A) è una SOTTO-sezione comprimibile dentro "Dettaglio calciatori della rosa"
   const reparti = ROLES.map((r) => {
-    const list = roster.filter((p) => p.ruolo === r).sort((a, b) => ord[a._lab.k] - ord[b._lab.k] || b._exp - a._exp);
+    const list = roster.filter((p) => p.ruolo === r).sort((a, b) =>
+      view === "pulita" ? (b._resaPulita - a._resaPulita)              // valore puro, decidi tu chi gioca
+                        : (ord[a._lab.k] - ord[b._lab.k] || b._exp - a._exp));
     if (!list.length) return "";
-    const body = `<div class="fmz-reparto">${list.map((p) => card(p, xiIds.has(p.id))).join("")}</div>`;
+    const body = `<div class="fmz-reparto">${list.map((p) => card(p, view === "consigliato" && xiIds.has(p.id), view)).join("")}</div>`;
     return anSection("fmz_rosa_" + r, `<span class="rp ${r}">${r}</span> ${RUOLI_NOME[r]}`, body);
   }).join("");
 
+  // toggle vista
+  const toggle = `<div class="fmz-view">
+    <button class="${view === "pulita" ? "on" : ""}" data-fmzview="pulita">Resa pulita</button>
+    <button class="${view === "consigliato" ? "on" : ""}" data-fmzview="consigliato">11 consigliato</button>
+  </div>`;
   // 3 categorie comprimibili: giornata passata → consigliata → dettaglio rosa (con sotto-sezioni per ruolo)
   const demoStrip = formDemo ? `<div class="fmz-head"><span class="demo-badge">DEMO</span>${demoBtn}</div>` : "";
-  el.innerHTML = demoStrip
+  el.innerHTML = demoStrip + toggle
     + anSection("fmz_past", "🏆 Formazione migliore giornata passata", pastGiornataBlock(roster, g))
-    + anSection("fmz_cons", "🧩 Formazione consigliata", xiHtml)
+    + (view === "consigliato" ? anSection("fmz_cons", "🧩 Formazione consigliata", xiHtml) : "")
     + anSection("fmz_rosa", "📋 Dettaglio calciatori della rosa", reparti);
 
-  function card(p, inXI) {
+  function card(p, inXI, view) {
     const st = p._st, pr = p._prob, m = p._match;
     const perc = pr && pr.perc != null ? pr.perc + "%" : "";
+    // chip DISPONIBILITÀ (info, separata dalla resa): 🟢 verde titolare · 🟠 arancione ballottaggio/
+    // media · ⚪ bianco riserva/subentro · 🔴 rosso infortunato. Sempre con la percentuale.
     const probTxt = p._rinvio6 ? `🔁 gara rinviata → <b>6 politico</b> garantito`
-      : p.infortunato ? `🩹 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
-      : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟡"} titolare ${perc}` : `⚪ riserva ${perc} (subentro)`)
+      : p.infortunato ? `🔴 infortunato${p.rientro ? " · rientro " + esc(p.rientro) : ""}`
+      : p._bal ? `🟠 ballottaggio · parte <b>${p._bal.start}%</b> · ${p._bal.fav ? "rientra" : "subentra"} <b>${p._bal.sub}%</b>`
+      : pr ? (pr.status === "titolare" ? `${pr.conf === "alta" ? "🟢" : "🟠"} titolare <b>${perc}</b>` : `⚪ riserva · subentro <b>${perc}</b>`)
       : "⚪ non tra i probabili";
     // scontro di giornata: sigla della SUA squadra in MAIUSCOLO grassetto, avversario minuscolo,
     // nell'ordine reale casa–trasferta (grassetto a sinistra = gioca in casa, a destra = fuori)
@@ -1965,7 +2009,9 @@ function renderFormazione() {
     // TRASPARENZA (per tarare giornata per giornata): resa = FV × contesto × P(gioca) + fattori
     const parts = (p._ctxParts || []).filter(([, d]) => Math.abs(d) >= 0.005)
       .map(([l, d]) => `${l} ${d >= 0 ? "+" : "−"}${Math.round(Math.abs(d) * 100)}%`).join(" · ");
-    const calcTxt = `🧮 resa <b>${(p._exp || 0).toFixed(2)}</b> = ${(p._fvBase || 0).toFixed(1)} FV × <b>${(p._ctxMult || 1).toFixed(2)}</b> ctx × ${Math.round((p._pPlay || 0) * 100)}% gioca${parts ? `<span class="fc-parts"> · ${parts}</span>` : ""}`;
+    const calcTxt = view === "pulita"
+      ? `🧮 resa <b>${(p._resaPulita || 0).toFixed(2)}</b> = ${(p._fmVenue || 0).toFixed(1)} FM${m ? (m.home ? "🏠" : "✈️") : ""} × <b>${(p._ctxMult || 1).toFixed(2)}</b> ctx${parts ? `<span class="fc-parts"> · ${parts}</span>` : ""}`
+      : `🧮 resa <b>${(p._exp || 0).toFixed(2)}</b> = <b>${(p._resaPulita || 0).toFixed(2)}</b> pulita × <b>${Math.round((p._availFactor || 0) * 100)}%</b> disp.`;
     return `<div class="fmz-card ${p._lab.k}${inXI ? " in-xi" : ""}${venue ? " has-venue" : ""}">
       <div class="fc-head"><span class="tag ${p._lab.k}">${p._lab.t}</span><span class="fc-name">${esc(shortName(p.nome))}</span><span class="fc-team">${matchTxt}</span>${inXI ? `<span class="xi-badge">11</span>` : ""}</div>
       <div class="fc-prob">${probTxt}</div>
@@ -2110,6 +2156,8 @@ function wire() {
     // Analisi: comprimi/espandi sezione + classifica reparto (senza re-render, solo DOM)
     const anh = e.target.closest("[data-ancollapse]");
     if (anh) { toggleAnSection(anh.dataset.ancollapse); return; }
+    const fv = e.target.closest("[data-fmzview]");
+    if (fv) { save(LS.fmzView, fv.dataset.fmzview); renderFormazione(); return; }
     const rex = e.target.closest("[data-repexpand]");
     if (rex) { toggleRepRank(rex.dataset.repexpand); return; }
     // doppio-tap per espandere le info del singolo (solo in modalità discreta)

@@ -1,26 +1,44 @@
 {
+<<<<<<< Updated upstream
   "aggiornato": "2026-09-10T15:25:21+00:00",
   "fonteAggiornata": "10/09/2026",
   "sources": {
     "Listone": {
       "fp": "0a383093c034",
       "lastChanged": "2026-09-10T15:25:21+00:00"
+=======
+  "aggiornato": "2026-09-11T12:18:10+00:00",
+  "fonteAggiornata": "11/09/2026",
+  "sources": {
+    "Listone": {
+      "fp": "0a383093c034",
+      "lastChanged": "2026-09-11T12:18:10+00:00"
+>>>>>>> Stashed changes
     },
     "Infortuni": {
-      "fp": "b60663758559",
-      "lastChanged": "2026-09-10T07:01:34+00:00"
+      "fp": "7acecda3f25c",
+      "lastChanged": "2026-09-11T12:18:10+00:00"
     },
     "Formazioni": {
       "fp": "1df0c5d11964",
+<<<<<<< Updated upstream
       "lastChanged": "2026-09-10T15:25:21+00:00"
+=======
+      "lastChanged": "2026-09-11T12:18:10+00:00"
+>>>>>>> Stashed changes
     },
     "Rigori/Punizioni": {
       "fp": "b26b51741d0a",
       "lastChanged": "2026-09-08T09:00:06+00:00"
     },
     "Corner": {
+<<<<<<< Updated upstream
       "fp": "f991cbaad91a",
       "lastChanged": "2026-09-10T15:25:21+00:00"
+=======
+      "fp": "f22354d12bba",
+      "lastChanged": "2026-09-11T12:18:10+00:00"
+>>>>>>> Stashed changes
     }
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",

@@ -111,6 +111,20 @@ def main():
             break  # giornata futura: stop
     json.dump(cache, open(CACHE, "w", encoding="utf-8"), ensure_ascii=False)
 
+    # sede (casa/trasferta) per SQUADRA e giornata, dal match cache (completo di tutte le gare) →
+    # ogni voto in byGio prende la sede giusta ANCHE per i subentranti (il lato dal riepilogo perde
+    # chi entra a gara in corso). Chiave = squadra normalizzata (accenti/maiuscole tolti).
+    import unicodedata
+    norm = lambda s: unicodedata.normalize("NFD", str(s or "")).encode("ascii", "ignore").decode().lower().strip()
+    venue_team_gio = {}   # {squadra_norm: {gio(str): "home"|"away"}}
+    for mid, mt in cache.items():
+        gio = str(mt.get("gio")); h_, a_ = mt.get("home"), mt.get("away")
+        if h_:
+            venue_team_gio.setdefault(norm(h_), {})[gio] = "home"
+        if a_:
+            venue_team_gio.setdefault(norm(a_), {})[gio] = "away"
+    team_by_fid = {str(p["fantaId"]): norm(p.get("squadra")) for p in roster}
+
     # aggrega per i miei 25 — SOLO i dati che la pagina-giocatore non dà e che qui sono
     # esatti (basati sulla PRESENZA dell'evento, non sull'ammontare): uscite, clean sheet,
     # presenze da titolare per sede. Gol/assist/gol-subiti (con split casa/trasferta) restano
@@ -157,6 +171,20 @@ def main():
     for fid, a in agg.items():
         d = detail.setdefault(fid, {})
         d["match"] = a
+        # FM casa/trasferta: media dei fm di byGio splittati per sede (fonte fm = pagina-giocatore)
+        bg = d.get("byGio") or {}
+        sides = venue_team_gio.get(team_by_fid.get(fid, ""), {})
+        hv, av = [], []
+        for gio, rec in bg.items():
+            s = sides.get(str(gio)); fm = (rec or {}).get("fm")
+            if fm is None or s is None:
+                continue
+            (hv if s == "home" else av).append(fm)
+        d.pop("fmHome", None); d.pop("nHome", None); d.pop("fmAway", None); d.pop("nAway", None)
+        if hv:
+            d["fmHome"] = round(sum(hv) / len(hv), 2); d["nHome"] = len(hv)
+        if av:
+            d["fmAway"] = round(sum(av) / len(av), 2); d["nAway"] = len(av)
     data["teamStats"] = teamStats
     data["lastFullGiornata"] = last_full
     data["numMatchesCache"] = len(cache)

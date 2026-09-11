@@ -45,7 +45,7 @@ const injuryFor = (p) => { const sn = surnameOf(p.nome), sq = _deac(p.squadra); 
 const FORM_CFG = {
   goalThresholds: [66, 72, 77, 81, 85, 89, 93, 97, 101],
   defMod: { includeKeeper: true, minDef: 4, bands: [[6, 1], [6.25, 2], [6.5, 3], [6.75, 4.5], [7, 6]] },
-  sub: { base: 6.0, bonusW: 0.5 },
+  venuePeso: 1.25, cameoRatio: 0.5, availCap: 0.85,
   factors: {
     enabled: true, clamp: 0.15, formWindow: 3, rampGiornate: 8,
     A: { offOpp: 0.09, offOwn: 0.09, oppStrength: 0.05, form: 0.08 },
@@ -56,13 +56,29 @@ const FORM_CFG = {
 };
 const MODULI = { "3-4-3": [3, 4, 3], "3-5-2": [3, 5, 2], "4-3-3": [4, 3, 3], "4-4-2": [4, 4, 2], "4-5-1": [4, 5, 1], "5-3-2": [5, 3, 2], "5-4-1": [5, 4, 1] };
 const COVER_MARGIN = 0.75;
-const pPlay = (st, prob, inj) => inj ? 0 : !prob ? 0.15 : prob.status === "titolare" ? (prob.perc ?? 70) / 100 : (prob.perc ?? 0) / 100;
-function fvIfPlays(st, prob, inj) {
-  if (inj) return 0;
-  const base = (st && st.pg > 0 && st.mfv) ? st.mfv : 6.0;
-  if (!prob || prob.status === "titolare") return base;
-  const bonusRate = (st && st.pg > 0 && st.mfv && st.mv) ? Math.max(0, st.mfv - st.mv) : 0;
-  return FORM_CFG.sub.base + FORM_CFG.sub.bonusW * bonusRate;
+// FM pesata per sede (media per gare, peso venuePeso sulla sede) — resa pulita
+function fmVenue(p, venue) {
+  const dt = g && g.detail ? g.detail[String(p.fantaId ?? p.id)] : null;
+  const st = p._st;
+  const overall = (dt && dt.fm) ? dt.fm : (st && st.pg > 0 && st.mfv ? st.mfv : 6.0);
+  if (!dt || !venue) return overall;
+  const fmS = venue === "home" ? dt.fmHome : dt.fmAway;
+  const nS = (venue === "home" ? dt.nHome : dt.nAway) || 0;
+  if (fmS == null || !nS) return overall;
+  const N = (dt.nHome || 0) + (dt.nAway || 0);
+  const wS = nS * (FORM_CFG.venuePeso ?? 1.25);
+  return (overall * N + fmS * wS) / (N + wS);
+}
+// fattore disponibilità (casi 1-5) per la vista "11 consigliato"
+function availFactor(p) {
+  if (p._injured) return 0;
+  const CAP = FORM_CFG.availCap ?? 0.85, CAMEO = FORM_CFG.cameoRatio ?? 0.5;
+  const b = g && g.ballottaggi ? g.ballottaggi[String(p.fantaId ?? p.id)] : null;
+  if (b) return Math.min(CAP, (b.start || 0) / 100 + ((b.sub || 0) / 100) * CAMEO);
+  const pr = p._prob;
+  if (!pr) return 0.15;
+  if (pr.status === "titolare") return (pr.perc ?? 70) / 100;
+  return Math.min(CAP, (pr.perc ?? 0) / 100);
 }
 function ptsRankMap() {
   if (g._ptsRank) return g._ptsRank;
@@ -150,10 +166,13 @@ roster.forEach((p) => {
   const inj = injuryFor(p);
   p._injured = !!inj; p._rientro = inj ? (inj.rientro || "") : "";
   p._ctx = teamCtx(p);
-  p._pPlay = pPlay(p._st, p._prob, p._injured);
-  p._fvBase = fvIfPlays(p._st, p._prob, p._injured);
-  p._fv = p._fvBase * contextMult(p);
-  p._exp = p._pPlay * p._fv;
+  p._match = (g.teamMatch || {})[p.squadra] || null;
+  const venue = p._match ? (p._match.home ? "home" : "away") : null;
+  const ctxMult = contextMult(p);
+  p._resaPulita = fmVenue(p, venue) * ctxMult;               // resa se gioca (senza disponibilità)
+  p._pPlay = availFactor(p);                                 // fattore disponibilità
+  p._fv = p._resaPulita;
+  p._exp = p._pPlay * p._resaPulita;                         // resa "11 consigliato" = pulita × fattore
 });
 const xi = bestXI(roster);
 const xiIds = xi ? xi.xi.map((p) => String(p.fantaId)) : [];

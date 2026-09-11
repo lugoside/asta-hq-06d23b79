@@ -385,6 +385,10 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-head .btn { width: auto; padding: 7px 12px; font-size: .8rem; }
 .fmz-head .btn.on { border-color: var(--accent2); color: var(--accent2); }
 .demo-badge { font-size: .6rem; background: var(--giallo); color: #1a1205; padding: 2px 6px; border-radius: 6px; vertical-align: middle; letter-spacing: .5px; }
+/* toggle vista Formazione: resa pulita ↔ 11 consigliato */
+.fmz-view { display: flex; gap: 6px; margin: 14px 14px 0; }
+.fmz-view button { flex: 1; padding: 8px 10px; border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 10px; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.fmz-view button.on { background: var(--accent2); color: #04140a; border-color: var(--accent2); }
 .fmz-xi { margin: 8px 14px; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
 .fmz-xi .xi-top { font-size: .92rem; margin-bottom: 4px; }
 .fmz-xi .xi-proj { font-size: .84rem; color: var(--muted); margin-bottom: 10px; }

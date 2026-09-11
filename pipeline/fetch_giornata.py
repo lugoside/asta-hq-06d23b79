@@ -104,7 +104,24 @@ def parse_probabili(teams):
         txt = ihtml.unescape(re.sub(r'\s+', " ", txt)).strip()
         if txt:
             commento[ihtml.unescape(nome).strip()] = txt
-    return {"fixtures": fixtures, "teamMatch": team_match, "probabili": probabili, "commento": commento}
+    # BALLOTTAGGI (sezione dedicata della pagina): ogni coppia ha le due quote-titolare
+    # (sommano a 100). Il panchinaro (quota più bassa) ha ANCHE un indice di subentro, che è
+    # la sua % nella lista riserve (già in `probabili`). Per ogni giocatore salvo:
+    #   start = sua quota-titolare · sub = indice subentro DELLA COPPIA · fav = favorito · partner
+    ballottaggi = {}
+    for ul in re.findall(r'<ul class="ballot-list">(.*?)</ul>', h, re.S):
+        items = re.findall(r'/(\d+)"[^>]*target[^>]*>.*?percentage">(\d+)%', ul, re.S)
+        if len(items) != 2:
+            continue
+        (f1, p1), (f2, p2) = (items[0][0], int(items[0][1])), (items[1][0], int(items[1][1]))
+        (favf, favp), (benf, benp) = ((f1, p1), (f2, p2)) if p1 >= p2 else ((f2, p2), (f1, p1))
+        pr = probabili.get(benf) or {}                      # indice subentro = % del panchinaro tra le riserve
+        s = pr.get("perc")
+        if s is None:
+            continue
+        ballottaggi[favf] = {"start": favp, "sub": s, "fav": True, "partner": benf}
+        ballottaggi[benf] = {"start": benp, "sub": s, "fav": False, "partner": favf}
+    return {"fixtures": fixtures, "teamMatch": team_match, "probabili": probabili, "commento": commento, "ballottaggi": ballottaggi}
 
 
 def calendar_fixtures():
@@ -155,7 +172,7 @@ def main():
     data = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
     data["stats"] = stats
     data["numGiocatoriStat"] = len(stats)
-    for k in ("probabili", "teamMatch", "fixtures", "commento"):
+    for k in ("probabili", "teamMatch", "fixtures", "commento", "ballottaggi"):
         if k in prob:
             data[k] = prob[k]
     # timestamp UTC dell'ultimo aggiornamento dati di giornata (mostrato in app in forma relativa)
