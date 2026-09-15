@@ -125,17 +125,37 @@ def main():
     upcoming = last_full + 1 if last_full >= G else G
     if upcoming != G:
         try:
-            tm = {}
-            for slug, h, a, dt in _raw(upcoming):
-                if slug in active_slugs:          # scarta il widget del turno attivo
-                    continue
-                tm[h] = {"opponent": a, "home": True}
-                tm[a] = {"opponent": h, "home": False}
+            up_matches = matches_of(upcoming, active_slugs)   # {(h,a):dt} REALI del turno da preparare
+            fx = data.get("fixtures") or []
+            fx_pairs = {(f.get("home"), f.get("away")) for f in fx}
+            if fx and (fx_pairs & set(up_matches.keys())):
+                # i fixtures (da probabili) sono GIÀ del turno da preparare → teamMatch coerente coi
+                # fixtures (stesse partite, così ogni squadra ha l'avversario: no squadre scoperte)
+                tm = {}
+                for f in fx:
+                    if f.get("home") and f.get("away"):
+                        tm[f["home"]] = {"opponent": f["away"], "home": True}
+                        tm[f["away"]] = {"opponent": f["home"], "home": False}
+                src = "fixtures"
+            else:
+                # fixtures stantii (turno concluso) → ricostruisci dal calendario del turno da preparare
+                tm = {}
+                for (h, a) in up_matches:
+                    tm[h] = {"opponent": a, "home": True}
+                    tm[a] = {"opponent": h, "home": False}
+                src = "calendario"
             if tm:
                 data["teamMatch"] = tm
-                print(f"  turno attivo {G} gia' concluso -> preparo la {upcoming}: teamMatch dal calendario ({len(tm) // 2} partite)")
+                print(f"  turno attivo {G} gia' concluso -> preparo la {upcoming}: teamMatch da {src} ({len(tm) // 2} partite)")
         except Exception as e:
             print(f"  rebuild teamMatch per {upcoming} non riuscito: {e}")
+    # rete di sicurezza (sempre): ogni squadra dei fixtures deve avere l'avversario in teamMatch
+    tmm = data.setdefault("teamMatch", {})
+    for f in (data.get("fixtures") or []):
+        h, a = f.get("home"), f.get("away")
+        if h and a:
+            tmm.setdefault(h, {"opponent": a, "home": True})
+            tmm.setdefault(a, {"opponent": h, "home": False})
 
     data["giornataCorrente"] = upcoming
     data["rinvii"] = rinvii
