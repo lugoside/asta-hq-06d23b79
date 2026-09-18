@@ -1,5 +1,5 @@
 {
-  "aggiornato": "2026-09-18T07:06:48+00:00",
+  "aggiornato": "2026-09-18T15:14:38+00:00",
   "fonteAggiornata": "18/09/2026",
   "sources": {
     "Listone": {
@@ -15,12 +15,12 @@
       "lastChanged": "2026-09-17T06:50:45+00:00"
     },
     "Rigori/Punizioni": {
-      "fp": "b26b51741d0a",
-      "lastChanged": "2026-09-08T09:00:06+00:00"
+      "fp": "460724dea3af",
+      "lastChanged": "2026-09-18T15:14:38+00:00"
     },
     "Corner": {
-      "fp": "8f9cafeac814",
-      "lastChanged": "2026-09-18T07:06:48+00:00"
+      "fp": "d97936ad1a67",
+      "lastChanged": "2026-09-18T15:14:38+00:00"
     }
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",
@@ -33,7 +33,7 @@
     "ball": 95,
     "ris": 191
   },
-  "numRigoristi": 77,
+  "numRigoristi": 78,
   "numPunizioni": 70,
   "numCorner": 67,
   "numGoalTiers": 173,
