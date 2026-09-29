@@ -8,7 +8,7 @@
     "Atalanta": {
       "titolari": [
         "Carnesecchi",
-        "Zappacosta",
+        "Bellanova",
         "Scalvini",
         "Kristensen",
         "Bernasconi",
@@ -21,6 +21,8 @@
       ],
       "ballottaggi": [
         "Hien",
+        "Zappacosta",
+        "Kolasinac",
         "Samardzic",
         "Raspadori",
         "Krstovic"
@@ -29,40 +31,40 @@
     "Bologna": {
       "titolari": [
         "Skorupski",
-        "Zortea",
+        "Helland",
         "Heggem",
         "Theate",
-        "Miranda",
+        "Zortea",
+        "Pobega",
         "Ferguson",
-        "El Azzouzi",
-        "Bernardeschi",
+        "Miranda",
         "Orsolini",
         "Dovbyk",
         "Cambiaghi"
       ],
       "ballottaggi": [
         "Holm",
-        "Pobega",
-        "Odgaard",
+        "Moro",
+        "Bernardeschi",
         "Piccoli"
       ]
     },
     "Cagliari": {
       "titolari": [
         "Caprile",
-        "Sugawara",
-        "Mina",
         "Zè Pedro",
+        "Mina",
+        "Rodriguez",
         "Obert",
         "Adopo",
         "Winks",
         "Romano",
         "Maldini",
-        "Nzola",
+        "Mendy",
         "Fazzini"
       ],
       "ballottaggi": [
-        "Rodriguez",
+        "Sugawara",
         "Deiola"
       ]
     },
@@ -72,7 +74,7 @@
         "Yan Couto",
         "Chalobah",
         "Ramon",
-        "Kaiki",
+        "Valle",
         "Da Cunha",
         "Perrone",
         "Diao",
@@ -81,9 +83,10 @@
         "Douvikas"
       ],
       "ballottaggi": [
-        "Valle",
+        "Kaiki",
         "Kempf",
         "Milla",
+        "Rodriguez",
         "Kean"
       ]
     },
@@ -92,8 +95,8 @@
         "De Gea",
         "Jimenez",
         "Dragusin",
+        "Ranieri",
         "Viery",
-        "Valdepenas",
         "Ndour",
         "Fagioli",
         "Atta",
@@ -102,8 +105,7 @@
         "Pedro Goncalves"
       ],
       "ballottaggi": [
-        "Pongracic",
-        "Joao Mario",
+        "Valdepenas",
         "Oulai",
         "Njie",
         "Beto"
@@ -135,18 +137,19 @@
         "Marcandalli",
         "Ostigard",
         "Vasquez",
-        "Ellertsson",
+        "Ehizibue",
         "Frendrup",
         "Sow",
-        "Mitaj",
         "Baldanzi",
-        "Vitinha",
+        "Ellertsson",
+        "Osmajic",
         "Colombo"
       ],
       "ballottaggi": [
+        "Drameh",
         "Messias",
-        "Traore",
-        "Ethan-Meichtry"
+        "El Shaarawy",
+        "Vitinha"
       ]
     },
     "Inter": {
@@ -155,7 +158,7 @@
         "Bisseck",
         "Akanji",
         "Bastoni",
-        "Spence",
+        "Diouf",
         "Barella",
         "Calhanoglu",
         "Zielinski",
@@ -165,7 +168,7 @@
       ],
       "ballottaggi": [
         "Stones",
-        "Diouf",
+        "Spence",
         "Sucic",
         "Pio Esposito"
       ]
@@ -177,16 +180,16 @@
         "Bremer",
         "Lucumì",
         "Celik",
-        "Locatelli",
-        "Sarr",
-        "Conceiçao",
+        "Douglas Luiz",
         "McKennie",
+        "Conceiçao",
+        "Nico Gonzalez",
         "Yildiz",
         "Kolo Muani"
       ],
       "ballottaggi": [
-        "Douglas Luiz",
-        "Boga",
+        "Sarr",
+        "Alajbegovic",
         "Woltemade"
       ]
     },
@@ -195,20 +198,21 @@
         "Mandas",
         "Marusic",
         "Doekhi",
-        "Sutalo",
+        "Provstgaard",
         "Nuno Tavares",
         "Taylor",
         "Rovella",
         "Frattesi",
-        "Isaksen",
-        "Pinamonti",
+        "Cancellieri",
+        "Noslin",
         "Zaccagni"
       ],
       "ballottaggi": [
-        "Provstgaard",
-        "Pedraza",
+        "Sutalo",
+        "Floriani",
         "Cataldi",
-        "Gudmundsson"
+        "Isaksen",
+        "Pinamonti"
       ]
     },
     "Lecce": {
@@ -236,42 +240,41 @@
       "titolari": [
         "Maignan",
         "Gila",
-        "Gabbia",
+        "De Winter",
         "Pavlovic",
         "Chukwueze",
         "Modric",
         "Rabiot",
-        "Bartesaghi",
+        "Moreira",
         "Pulisic",
         "Cissé",
         "Ramos"
       ],
       "ballottaggi": [
-        "Jashari",
-        "Diego Moreira",
+        "Gabbia",
+        "Estupinan",
+        "Musah",
         "Saelemaekers"
       ]
     },
     "Monza": {
       "titolari": [
         "Tornqvist",
-        "Birindelli",
+        "Kouadio",
         "Ziolkowski",
         "Carboni",
-        "Touré",
+        "Birindelli",
         "Pessina",
         "Folorunsho",
         "Mangas",
         "Zeballos",
-        "Ngonge",
+        "Robinson",
         "Varela"
       ],
       "ballottaggi": [
-        "Kouadio",
-        "Mout",
-        "Foet Ondoa",
         "Akinsanmiro",
         "Colpani",
+        "Ngonge",
         "Cutrone"
       ]
     },
@@ -287,12 +290,14 @@
         "McTominay",
         "Politano",
         "Hojlund",
-        "Alisson"
+        "Lang"
       ],
       "ballottaggi": [
-        "Badiashile",
+        "Milinkovic",
+        "Marin",
         "Olivera",
         "Anguissa",
+        "Alisson",
         "Neres"
       ]
     },
@@ -302,18 +307,18 @@
         "Delprato",
         "Troilo",
         "Diego Carlos",
-        "Valeri",
-        "Ordonez",
-        "Keita",
-        "Fabbian",
+        "Britschgi",
         "Bernabé",
+        "Keita",
+        "Valeri",
+        "Touré",
         "Lontani",
-        "Touré"
+        "Romero"
       ],
       "ballottaggi": [
-        "Britschgi",
-        "Nicolussi Caviglia",
-        "Romero"
+        "Sierro",
+        "Fabbian",
+        "Elphege"
       ]
     },
     "Roma": {
@@ -321,39 +326,38 @@
         "Svilar",
         "Hermoso",
         "Mancini",
-        "Ndicka",
+        "Balerdi",
         "Molina",
         "Cristante",
         "Kone",
         "Wesley",
-        "Mora",
+        "Soulé",
         "Dybala",
         "Malen"
       ],
       "ballottaggi": [
-        "Balerdi",
-        "De Roon",
-        "Pellegrini",
-        "Soulé"
+        "Ndicka",
+        "Lulli",
+        "Mora"
       ]
     },
     "Sassuolo": {
       "titolari": [
         "Muric",
-        "Van der Brempt",
-        "Caleta-Car",
+        "Cinquegrano",
         "Idzes",
+        "Leysen",
         "Doig",
-        "Thorstvedt",
+        "Bakola",
         "Matic",
-        "Adzic",
+        "Thorstvedt",
         "Berardi",
         "Esposito",
         "Laurienté"
       ],
       "ballottaggi": [
         "Obrador",
-        "Bakola",
+        "Adzic",
         "Volpato",
         "Bowie"
       ]
@@ -367,22 +371,22 @@
         "Belghali",
         "Mandragora",
         "Fitz-Jim",
+        "Braganca",
         "Cacciamani",
         "Vlasic",
-        "Casadei",
         "Simeone"
       ],
       "ballottaggi": [
-        "Ismajli",
         "Fortini",
-        "Braganca",
+        "Gineitis",
+        "Casadei",
         "Adams"
       ]
     },
     "Udinese": {
       "titolari": [
         "Okoye",
-        "Bertola",
+        "Abankwah",
         "Kabasele",
         "Solet",
         "Vojvoda",
@@ -394,9 +398,9 @@
         "Davis"
       ],
       "ballottaggi": [
-        "Zanoli",
-        "Unai Gomez",
-        "Miller"
+        "Alaba",
+        "Miller",
+        "Unai Gomez"
       ]
     },
     "Venezia": {
@@ -408,7 +412,7 @@
         "Hainaut",
         "Basic",
         "Busio",
-        "Sohm",
+        "Kike Perez",
         "Correia",
         "Adams",
         "Yeboah"
@@ -416,7 +420,7 @@
       "ballottaggi": [
         "Mazzocchi",
         "Haps",
-        "Kike Perez"
+        "Sohm"
       ]
     }
   }
