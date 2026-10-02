@@ -134,13 +134,22 @@ let _tapT = 0, _tapEl = null;
 const ui = { screen: "asta", role: "ALL", sort: "consigliato", onlyFav: false, hideTaken: false, searchL: "", expandedTeams: new Set() };
 
 // --- stato sincronizzazione cloud (Firebase RTDB via REST) ---
-// Default per questa lega (Valerio): URL + Codice preimpostati, sync attiva.
+// Default: solo l'URL del DB. Il Codice Lega NON sta nel codice: arriva dal link d'invito o da Impostazioni.
 // Vengono usati solo se non c'è già una configurazione salvata sul dispositivo.
 let SYNC = load(LS.sync, {
   url: "https://fantaasta-62ee7-default-rtdb.europe-west1.firebasedatabase.app/",
-  code: "lugoasta",
+  code: "",
   on: true,
 });
+// Link d'invito: <indirizzo app>#lega=CODICE → salva il Codice Lega SOLO su questo dispositivo,
+// attiva la sync e ripulisce l'indirizzo. Il codice non è mai scritto nel repository.
+(() => {
+  const m = location.hash.match(/(?:^#|&)lega=([^&]+)/);
+  if (!m) return;
+  SYNC.code = decodeURIComponent(m[1]).trim(); SYNC.on = true;
+  save(LS.sync, SYNC);
+  history.replaceState(null, "", location.pathname + location.search);
+})();
 let DEVICE_ID = load(LS.device, "");
 if (!DEVICE_ID) { DEVICE_ID = "dev-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save(LS.device, DEVICE_ID); }
 let _esMoves = null, _esConfig = null, _pollId = null, _syncStatus = "off", _configTimer = null, _seeded = false;
