@@ -28,7 +28,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v89"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v91"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -224,7 +224,7 @@ function applyResetIfNeeded() {
 }
 async function deleteCloudMoves() {
   const url = movesUrl(); if (!SYNC.on || !url) return;
-  try { await fetch(url + ".json", { method: "DELETE" }); } catch {}
+  try { await fbFetch(url + ".json", { method: "DELETE" }); } catch {}
 }
 // ricostruisce PURCHASES dal log di mosse; i team condivisi tornano id locali (MY_TEAM per me)
 function rebuildPurchases() {
@@ -275,6 +275,13 @@ function nodeBase() {
   if (!SYNC.url || !SYNC.code) return null;
   return SYNC.url.replace(/\/+$/, "") + "/leghe/" + encodeURIComponent(SYNC.code.trim());
 }
+// fetch verso Firebase: una risposta HTTP non-2xx (401/403 regole, 5xx) è un ERRORE.
+// Prima fetch() "riusciva" anche su 403 → la mossa risultava posted e non veniva più ritentata.
+async function fbFetch(url, init) {
+  const r = await fetch(url, init);
+  if (!r.ok) throw new Error("Firebase HTTP " + r.status);
+  return r;
+}
 function movesUrl()  { const b = nodeBase(); return b ? b + "/moves"  : null; }
 function configUrl() { const b = nodeBase(); return b ? b + "/config" : null; }
 function setSyncStatus(s) { _syncStatus = s; if (ui.screen === "impostazioni") renderSync(); }
@@ -314,7 +321,7 @@ async function pushMoveToCloud(m) {
   const body = { uid: m.uid, type: m.type, playerId: m.playerId, byDevice: m.byDevice, ts: { ".sv": "timestamp" } };
   for (const k of ["team", "price", "nome", "ruolo", "squadra"]) if (m[k] != null) body[k] = m[k];
   try {
-    await fetch(url + ".json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await fbFetch(url + ".json", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     m.posted = true; saveMoves(); setSyncStatus("ok");             // posted solo DOPO invio riuscito → fetch interrotta = ritentata
   } catch { setSyncStatus("err"); }
   finally { _inflight.delete(m.uid); }
@@ -343,17 +350,24 @@ function mergeCloudMoves(obj) {
 }
 
 // --- CONFIG condivisa: pubblicazione (app piena) e adozione ---------------------------
-function scheduleConfigPush() { if (!SYNC.on) return; clearTimeout(_configTimer); _configTimer = setTimeout(pushConfig, 800); }
+// _configDirty: c'è una modifica locale di config non ancora confermata dal cloud.
+// Finché è vera NON si adotta la config remota (polling/SSE riporterebbero il valore
+// vecchio e la modifica verrebbe annullata in silenzio).
+let _configDirty = false;
+function scheduleConfigPush() { if (!SYNC.on) return; _configDirty = true; clearTimeout(_configTimer); _configTimer = setTimeout(pushConfig, 800); }
 function sharedConfigPayload() { const o = {}; for (const k of SHARED_CONFIG_KEYS) o[k] = CONFIG[k]; return o; }
 async function pushConfig() {
   const url = configUrl(); if (!SYNC.on || !url) return;
+  clearTimeout(_configTimer); _configTimer = null;
+  _configDirty = true;
   try {
-    await fetch(url + ".json", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedConfigPayload()) });
+    await fbFetch(url + ".json", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedConfigPayload()) });
+    _configDirty = false;                                           // confermata: si può tornare ad adottare
     setSyncStatus("ok");
-  } catch { setSyncStatus("err"); }
+  } catch { setSyncStatus("err"); }                                 // resta dirty → la ritenta pullOnce
 }
 function adoptConfig(remote) {
-  if (!remote || typeof remote !== "object") return false;
+  if (!remote || typeof remote !== "object" || _configDirty) return false;
   const prevReset = CONFIG.resetAt || 0;
   let changed = false;
   for (const k of SHARED_CONFIG_KEYS) {
@@ -372,7 +386,7 @@ async function reconcileSync() {
   try {
     // 1) config: se il cloud ce l'ha, è la verità condivisa → adotta; se è vuota e ho una
     //    config non-default, la semino io (app piena = proprietaria della lega).
-    const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json();
+    const rc = await (await fbFetch(cu + ".json", { cache: "no-store" })).json();
     if (rc && typeof rc === "object") {
       if (adoptConfig(rc)) { recompute(); renderAll(); }
       // se il cloud è in VECCHIO formato (teams=nomi, o senza aliases), pubblico la config MIGRATA
@@ -385,7 +399,7 @@ async function reconcileSync() {
     } else if (haveLocalConfig()) await pushConfig();
 
     // 2) mosse: se il log remoto è vuoto e non ho ancora mosse locali, migro dai vecchi acquisti.
-    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    const rm = await (await fbFetch(mu + ".json", { cache: "no-store" })).json();
     const remoteEmpty = !rm || (typeof rm === "object" && !Object.keys(rm).length);
     if (remoteEmpty && !MOVES.length) await seedMovesFromLegacy();
     // AUTO-GUARIGIONE: mosse locali su vecchi NOMI ma config già su slot (cache pre-migrazione) →
@@ -404,16 +418,16 @@ async function reconcileSync() {
 async function migrateCloudMovesToSlots() {
   const mu = movesUrl(); if (!SYNC.on || !mu) return;
   try {
-    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    const rm = await (await fbFetch(mu + ".json", { cache: "no-store" })).json();
     if (!rm || typeof rm !== "object") return;
     const daFare = Object.entries(rm).filter(([, m]) => m && m.team != null && !SLOT_RE.test(m.team));
     for (const [pushId, m] of daFare) {
       const slot = toSlot(m.team);
       if (SLOT_RE.test(slot)) {
-        await fetch(`${mu}/${encodeURIComponent(pushId)}/team.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slot) });
+        await fbFetch(`${mu}/${encodeURIComponent(pushId)}/team.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slot) });
       }
     }
-    if (daFare.length) { const rm2 = await (await fetch(mu + ".json", { cache: "no-store" })).json(); if (rm2) { mergeCloudMoves(rm2); rebuildPurchases(); } }
+    if (daFare.length) { const rm2 = await (await fbFetch(mu + ".json", { cache: "no-store" })).json(); if (rm2) { mergeCloudMoves(rm2); rebuildPurchases(); } }
   } catch {}
 }
 // migrazione una-tantum: acquisti del vecchio modello → mosse `buy`.
@@ -421,7 +435,7 @@ async function migrateCloudMovesToSlots() {
 async function seedMovesFromLegacy() {
   let legacy = load(LS.purchases, []);
   if (!Array.isArray(legacy) || !legacy.length) {
-    try { const lp = await (await fetch(nodeBase() + "/purchases.json", { cache: "no-store" })).json(); if (Array.isArray(lp)) legacy = lp; } catch {}
+    try { const lp = await (await fbFetch(nodeBase() + "/purchases.json", { cache: "no-store" })).json(); if (Array.isArray(lp)) legacy = lp; } catch {}
   }
   if (!Array.isArray(legacy) || !legacy.length) return;
   for (const pu of legacy) emitMove({ type: "buy", playerId: pu.playerId, team: pu.team, price: pu.price, nome: pu.nome, ruolo: pu.ruolo, squadra: pu.squadra });
@@ -429,10 +443,11 @@ async function seedMovesFromLegacy() {
 async function pullOnce() {
   const mu = movesUrl(), cu = configUrl(); if (!SYNC.on || !mu) return;
   try {
-    const rm = await (await fetch(mu + ".json", { cache: "no-store" })).json();
+    const rm = await (await fbFetch(mu + ".json", { cache: "no-store" })).json();
     const cm = mergeCloudMoves(rm);
     let cc = false;
-    if (cu) { const rc = await (await fetch(cu + ".json", { cache: "no-store" })).json(); cc = adoptConfig(rc); }
+    if (cu && _configDirty && !_configTimer) await pushConfig();     // modifica config rimasta in sospeso (offline/errore)
+    if (cu) { const rc = await (await fbFetch(cu + ".json", { cache: "no-store" })).json(); cc = adoptConfig(rc); }
     if (cm || cc) { recompute(); renderAll(); }
     await flushPending();
     setSyncStatus("ok");

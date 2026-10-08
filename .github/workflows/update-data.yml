@@ -76,6 +76,11 @@ jobs:
     # aggiornamento COMPLETO (post-giornata / manuale): solo se il gate lo consente
     needs: gate
     if: needs.gate.outputs.should_run == 'true'
+    # UN SOLO job alla volta scrive i dati (update e probabili condividono il gruppo):
+    # niente più push concorrenti sullo stesso giornata.json → niente retry che perdono dati
+    concurrency:
+      group: fantaasta-data-commit
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,8 +137,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          FILES="docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json pipeline/matches_cache.json pipeline/notify_state.json"
           for i in 1 2 3 4 5; do
-            git add docs/data pipeline/formazioni_fanta.json pipeline/goal_formazioni.json pipeline/fvm_history.json pipeline/matches_cache.json pipeline/notify_state.json
+            git add $FILES
             if git diff --cached --quiet; then
               echo "Nessuna variazione nei dati."; exit 0
             fi
@@ -141,15 +147,14 @@ jobs:
             if git push; then
               echo "Pubblicato al tentativo $i."; exit 0
             fi
-            echo "Push rifiutato (remoto avanzato): riallineo e rigenero (tentativo $i)…"
-            git reset --hard HEAD~1
+            # Remoto avanzato (es. push di codice fatto a mano): i file dati li ha generati
+            # TUTTI questo job → li salvo, mi riallineo al remoto e li rimetto identici.
+            # (Prima si rigenerava solo una parte e giornata.json/matches_cache andavano persi.)
+            echo "Push rifiutato (remoto avanzato): riallineo e riapplico i dati (tentativo $i)…"
+            tar -cf /tmp/dati.tar $FILES
             git fetch origin main
             git reset --hard origin/main
-            python pipeline/fetch_probabili.py || echo "probabili non aggiornate (retry), proseguo"
-            python pipeline/fetch_goal_formazioni.py || echo "goal.com non aggiornato (retry), proseguo"
-            python pipeline/build_listone_fanta.py
-            python pipeline/build_players.py
-            node pipeline/notify.mjs || echo "notify (retry) non riuscito, proseguo"
+            tar -xf /tmp/dati.tar
           done
           echo "Impossibile pubblicare dopo 5 tentativi."; exit 1
       # Genera i dati RIDOTTI e li pubblica nel repo LITE (serve il secret LITE_REPO_TOKEN).
@@ -191,6 +196,9 @@ jobs:
   probabili:
     needs: probabili-gate
     if: needs.probabili-gate.outputs.should_run == 'true'
+    concurrency:
+      group: fantaasta-data-commit
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -234,7 +242,15 @@ jobs:
           git commit -m "chore: aggiorna probabili/notifiche [skip ci]"
           for i in 1 2 3; do
             if git push; then echo "Pubblicato (tentativo $i)."; exit 0; fi
-            echo "Push rifiutato: riallineo (tentativo $i)…"
-            git pull --rebase --autostash origin main || true
+            # niente rebase (su conflitto restava a metà e bloccava i retry): salvo i miei
+            # file, mi riallineo al remoto e li riapplico (fetch_giornata lavora già in MERGE)
+            echo "Push rifiutato: riallineo e riapplico (tentativo $i)…"
+            tar -cf /tmp/prob.tar docs/data/giornata.json pipeline/notify_state.json
+            git fetch origin main
+            git reset --hard origin/main
+            tar -xf /tmp/prob.tar
+            git add docs/data/giornata.json pipeline/notify_state.json
+            git diff --cached --quiet && { echo "Nulla da pubblicare dopo il riallineamento."; exit 0; }
+            git commit -m "chore: aggiorna probabili/notifiche [skip ci]"
           done
           echo "Push non riuscito dopo 3 tentativi."; exit 1

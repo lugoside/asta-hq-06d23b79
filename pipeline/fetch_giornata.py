@@ -23,6 +23,9 @@ UA = "Mozilla/5.0"
 STATS_URL = "https://www.fantacalcio.it/statistiche-serie-a"
 PROB_URL = "https://www.fantacalcio.it/probabili-formazioni-serie-a"
 QUOT_URL = "https://www.fantacalcio.it/quotazioni-fantacalcio"
+# sotto questa soglia la pagina statistiche è considerata "rotta" (in stagione sono ~600;
+# anche dopo la 1a giornata sono ben oltre 150)
+MIN_STATS = 150
 
 
 def fetch_html(u):
@@ -170,8 +173,19 @@ def main():
     # → così una run "solo probabili" non cancella i dati del motore.
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     data = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
-    data["stats"] = stats
-    data["numGiocatoriStat"] = len(stats)
+    # SOGLIE DI SANITÀ (come MIN_TEAMS negli altri scraper): se il sito cambia layout
+    # le regex non trovano nulla e restituiscono {} SENZA errore → non sovrascrivere
+    # dati buoni con dati vuoti (tab Formazione svuotata + notifiche spurie).
+    prev_stats = data.get("stats") or {}
+    if len(stats) < MIN_STATS and len(prev_stats) >= MIN_STATS:
+        print(f"  ATTENZIONE: solo {len(stats)} statistiche (< {MIN_STATS}): tengo le "
+              f"{len(prev_stats)} precedenti (layout del sito cambiato?)")
+    else:
+        data["stats"] = stats
+        data["numGiocatoriStat"] = len(stats)
+    if not prob.get("probabili") and data.get("probabili") and prob.get("fixtures"):
+        print("  ATTENZIONE: 0 probabili ma ci sono partite: tengo i probabili precedenti")
+        prob = {k: v for k, v in prob.items() if k not in ("probabili", "commento", "ballottaggi")}
     for k in ("probabili", "teamMatch", "fixtures", "commento", "ballottaggi"):
         if k in prob:
             data[k] = prob[k]
@@ -180,10 +194,11 @@ def main():
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     print(f"giornata.json scritto: {os.path.abspath(OUT)}")
-    tit = sum(1 for v in prob["probabili"].values() if v["status"] == "titolare")
-    print(f"  statistiche: {len(stats)} giocatori")
-    print(f"  partite: {len(prob['fixtures'])}  |  probabili: {len(prob['probabili'])} (titolari: {tit}) | commenti: {len(prob['commento'])}")
-    print("  fixtures:", ", ".join(f"{x['home']}-{x['away']}" for x in prob["fixtures"][:5]), "...")
+    pr, fx = data.get("probabili") or {}, data.get("fixtures") or []
+    tit = sum(1 for v in pr.values() if v.get("status") == "titolare")
+    print(f"  statistiche: {len(data.get('stats') or {})} giocatori")
+    print(f"  partite: {len(fx)}  |  probabili: {len(pr)} (titolari: {tit}) | commenti: {len(data.get('commento') or {})}")
+    print("  fixtures:", ", ".join(f"{x['home']}-{x['away']}" for x in fx[:5]), "...")
 
 
 if __name__ == "__main__":
