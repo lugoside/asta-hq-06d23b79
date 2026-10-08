@@ -1,14 +1,14 @@
 {
-  "aggiornato": "2026-10-07T06:40:18+00:00",
-  "fonteAggiornata": "07/10/2026",
+  "aggiornato": "2026-10-08T09:05:50+00:00",
+  "fonteAggiornata": "08/10/2026",
   "sources": {
     "Listone": {
-      "fp": "5dc69cdf5bcb",
-      "lastChanged": "2026-10-07T06:40:18+00:00"
+      "fp": "2c9f3dfb55e0",
+      "lastChanged": "2026-10-08T09:05:50+00:00"
     },
     "Infortuni": {
-      "fp": "f074b37299a1",
-      "lastChanged": "2026-10-07T06:40:18+00:00"
+      "fp": "eeefb0f14bb3",
+      "lastChanged": "2026-10-08T09:05:50+00:00"
     },
     "Formazioni": {
       "fp": "a310307606ee",
@@ -19,8 +19,8 @@
       "lastChanged": "2026-09-29T13:15:37+00:00"
     },
     "Corner": {
-      "fp": "3f698bb4a66c",
-      "lastChanged": "2026-10-07T06:40:18+00:00"
+      "fp": "e174334ef8dc",
+      "lastChanged": "2026-10-08T09:05:50+00:00"
     }
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",
