@@ -399,6 +399,19 @@ nav.tabs button.on { color: var(--accent2); }
 .fmz-past .pg-rinvio { cursor: help; }
 .fmz-xi .xi-line { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .86rem; }
 .xi-bench { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: .82rem; }
+/* XI consigliato: MIGLIORE evidenziato vs ALTERNATIVE quasi equivalenti (comprimibili) */
+.fmz-xi.primary { border-left: 4px solid var(--accent2); }
+.fmz-badge { display: inline-block; font-size: .62rem; font-weight: 800; letter-spacing: .4px; padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-right: 6px; text-transform: uppercase; }
+.fmz-badge.best { background: var(--accent2); color: #04140a; }
+.fmz-badge.alt { background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
+.fmz-alt-head { margin: 12px 14px 2px; font-size: .74rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+details.fmz-alt { margin: 6px 14px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); opacity: .88; }
+details.fmz-alt[open] { opacity: 1; }
+details.fmz-alt > summary { cursor: pointer; list-style: none; padding: 10px 12px; font-size: .86rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+details.fmz-alt > summary::-webkit-details-marker { display: none; }
+details.fmz-alt > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform .15s; }
+details.fmz-alt[open] > summary::after { transform: rotate(90deg); }
+.fmz-alt-body { padding: 0 12px 12px; }
 .bench-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bench-item { display: inline-flex; align-items: center; gap: 5px; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px 3px 4px; font-size: .78rem; }
 .bench-item .rp { width: 18px; height: 18px; font-size: .6rem; }
@@ -441,7 +454,9 @@ nav.tabs button.on { color: var(--accent2); }
 /* le categorie prendono l'inset laterale (14px); i blocchi interni non lo ri-applicano */
 #formazioneBody > .an-sec { margin: 16px 14px 0; }
 #formazioneBody .fmz-past,
-#formazioneBody .fmz-xi { margin-left: 0; margin-right: 0; }
+#formazioneBody .fmz-xi,
+#formazioneBody .fmz-alt,
+#formazioneBody .fmz-alt-head { margin-left: 0; margin-right: 0; }
 /* sotto-sezioni per ruolo dentro "Dettaglio calciatori": compatte, senza doppio inset */
 #formazioneBody .an-sec .an-sec { margin-top: 12px; }
 #formazioneBody .an-sec .an-sec .fmz-reparto { margin: 6px 0 0; }

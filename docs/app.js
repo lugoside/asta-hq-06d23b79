@@ -28,7 +28,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v92"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v93"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1718,12 +1718,14 @@ function bestRole(pool, n) {
 }
 // migliore XI sui 7 moduli: ogni reparto scelto con bestRole (cover-aware), il totale
 // (Σ valori-slot + modificatore difesa) → gol proiettati via soglie.
-function bestXI(players) {
+// classifica di TUTTI i moduli fattibili (desc per punteggio): ogni voce come bestXI.
+// Serve sia per il migliore (prima voce) sia per le alternative quasi equivalenti.
+function rankedXI(players) {
   const byRole = { P: [], D: [], C: [], A: [] };
   players.forEach((p) => (byRole[p.ruolo] || (byRole[p.ruolo] = [])).push(p));
   const cache = {};
   const roleSel = (r, n) => cache[r + n] || (cache[r + n] = bestRole(byRole[r] || [], n));
-  let best = null;
+  const out = [];
   for (const [mod, [nd, nc, na]] of Object.entries(MODULI)) {
     if (byRole.P.length < 1 || byRole.D.length < nd || byRole.C.length < nc || byRole.A.length < na) continue;
     const need = { P: 1, D: nd, C: nc, A: na };
@@ -1737,11 +1739,12 @@ function bestXI(players) {
     }
     const defMod = defenseModifier(defs.map(expVoto), expVoto(roleSel("P", 1).starters[0]));
     total += defMod;
-    const goals = goalsFromScore(total);
-    if (!best || total > best.total) best = { mod, xi, defMod, total, goals };
+    out.push({ mod, xi, defMod, total, goals: goalsFromScore(total) });
   }
-  return best;
+  return out.sort((a, b) => b.total - a.total);
 }
+// migliore XI = il modulo in cima alla classifica (null se rosa insufficiente)
+function bestXI(players) { return rankedXI(players)[0] || null; }
 
 // Ingredienti GREZZI dei fattori di contesto per un giocatore (dal prossimo turno +
 // classifica + teamStats casa/trasferta). Il mapping in moltiplicatore si tara insieme.
@@ -1969,30 +1972,45 @@ function renderFormazione() {
     p._note = commentSnippet(p.nome, p.squadra, g);
   });
 
-  // XI consigliato
-  const xi = bestXI(roster);
+  // XI consigliato: modulo MIGLIORE + alternative quasi equivalenti (entro −2% del punteggio).
+  // righe-ruolo + panchina di un dato modulo (riusato dal migliore e da ogni alternativa)
+  function xiLinesHtml(x) {
+    const line = (r) => x.xi.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
+    const ids = new Set(x.xi.map((p) => p.id));
+    // panchina = resto della rosa per ruolo, in ordine di resa attesa (prob. di subentro)
+    const bench = roster.filter((p) => !ids.has(p.id)).sort((a, b) => b._exp - a._exp);
+    const benchLine = (r) => bench.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
+    const benchHtml = bench.length ? `<div class="xi-bench">
+        <div class="xi-top"><b>Panchina consigliata</b> <span class="meta">(per ruolo · ordine di subentro)</span></div>
+        ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
+      </div>` : "";
+    const rinvioXi = x.xi.filter((p) => p._rinvio6).map((p) => esc(shortName(p.nome)));
+    return `<div class="xi-proj">punteggio <b>${x.total.toFixed(1)}</b>${x.defMod ? ` <span class="meta">(+${x.defMod} dif)</span>` : ""} · <b>${x.goals}</b> gol proiettati</div>
+      ${rinvioXi.length ? `<div class="fmz-rinvio">🔁 In lista col <b>6 politico</b> (gara rinviata): ${rinvioXi.join(", ")}</div>` : ""}
+      ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
+      ${benchHtml}`;
+  }
+  const ranked = rankedXI(roster);
+  const xi = ranked[0] || null;
   const xiIds = new Set(xi ? xi.xi.map((p) => p.id) : []);
   let xiHtml = "";
   if (xi) {
-    const line = (r) => xi.xi.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
-    // panchina come gli 11: righe per ruolo, dentro ogni ruolo in ordine di prob. di subentro (resa attesa)
-    const bench = roster.filter((p) => !xiIds.has(p.id)).sort((a, b) => b._exp - a._exp);
-    const benchLine = (r) => bench.filter((p) => p.ruolo === r).map((p) => esc(shortName(p.nome))).join(", ");
-    const benchHtml = bench.length ? `<div class="xi-bench">
-      <div class="xi-top"><b>Panchina consigliata</b> <span class="meta">(per ruolo · ordine di subentro)</span></div>
-      ${ROLES.map((r) => { const l = benchLine(r); return l ? `<div class="xi-line"><span class="rp ${r}">${r}</span> ${l}</div>` : ""; }).join("")}
-    </div>` : "";
-    const projTxt = `punteggio <b>${xi.total.toFixed(1)}</b>${xi.defMod ? ` <span class="meta">(+${xi.defMod} dif)</span>` : ""} · <b>${xi.goals}</b> gol proiettati`;
+    const ALT_GAP = 0.02;  // alternative col punteggio entro il 2% del migliore
+    const alts = ranked.slice(1).filter((a) => a.total >= xi.total * (1 - ALT_GAP));
     const updated = fmtLastData(g && g.aggiornato);
-    const rinvioXi = xi.xi.filter((p) => p._rinvio6).map((p) => esc(shortName(p.nome)));
-    xiHtml = `<div class="fmz-xi">
-      <div class="xi-top">Modulo <b>${xi.mod}</b></div>
-      <div class="xi-proj">${projTxt}</div>
-      ${updated ? `<div class="fmz-updated">🕒 Ultimo dato: <b>${updated}</b></div>` : ""}
-      ${rinvioXi.length ? `<div class="fmz-rinvio">🔁 In lista col <b>6 politico</b> (gara rinviata): ${rinvioXi.join(", ")}</div>` : ""}
-      ${ROLES.map((r) => `<div class="xi-line"><span class="rp ${r}">${r}</span> ${esc(line(r)) || "<span class='meta'>—</span>"}</div>`).join("")}
-      ${benchHtml}
-    </div>`;
+    const altHtml = alts.length
+      ? `<div class="fmz-alt-head">Alternative quasi equivalenti <span class="meta">(entro −2% del punteggio)</span></div>`
+        + alts.map((a) => {
+            const gap = xi.total - a.total, gapPct = xi.total ? gap / xi.total * 100 : 0;
+            return `<details class="fmz-alt"><summary><span class="fmz-badge alt">≈</span> Modulo <b>${a.mod}</b> <span class="meta">punteggio ${a.total.toFixed(1)} · −${gap.toFixed(1)} (−${gapPct.toFixed(1)}%)</span></summary>
+              <div class="fmz-alt-body">${xiLinesHtml(a)}</div></details>`;
+          }).join("")
+      : "";
+    xiHtml = `<div class="fmz-xi primary">
+        <div class="xi-top"><span class="fmz-badge best">★ Migliore</span> Modulo <b>${xi.mod}</b></div>
+        ${updated ? `<div class="fmz-updated">🕒 Ultimo dato: <b>${updated}</b></div>` : ""}
+        ${xiLinesHtml(xi)}
+      </div>${altHtml}`;
   }
 
   // VISTA: "pulita" (resa se gioca, ordina per valore puro) | "consigliato" (con disponibilità)
