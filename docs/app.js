@@ -28,7 +28,7 @@ async function checkMasterPw(pw) {
   } catch { return false; }
 }
 let unlocked = load(LS.unlocked, false);
-const APP_VERSION = "v91"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
+const APP_VERSION = "v92"; // mostrata in Setup per capire se l'app è aggiornata (allineata a sw.js)
 const HISTORY_MAX = 40; // quanti backup automatici conservare
 const RUOLO_NOME = { P: "Portiere", D: "Difensore", C: "Centrocampista", A: "Attaccante" };
 const FORM_LABEL = { titolare: "🟢 Titolare", ballottaggio: "🟡 Ballottaggio", riserva: "⚪ Riserva" };
@@ -1549,14 +1549,24 @@ function activeRoster() {
 // (vedi FORM_CFG). Ballottaggio: start(own) + subentro(coppia)×cameoRatio, cappato; riserva pura:
 // subentro cappato; titolare puro: % lineare (no cap); infortunato/out: 0.
 function availFactor(p, g) {
-  if (p.infortunato) return 0;                                    // caso 5
-  const CAP = FORM_CFG.availCap ?? 0.85, CAMEO = FORM_CFG.cameoRatio ?? 0.5;
+  if (p.infortunato) return 0;                                    // caso 5: out/infortunato/squalificato
+  const F = FORM_CFG, CAMEO = F.cameoRatio ?? 0.5;
   const b = g && g.ballottaggi ? g.ballottaggi[String(p.fantaId ?? p.id)] : null;
-  if (b) return Math.min(CAP, (b.start || 0) / 100 + ((b.sub || 0) / 100) * CAMEO);   // casi 2/3
+  if (b) {
+    const start = (b.start || 0) / 100, sub = (b.sub || 0) / 100;
+    // favorito: la SUA quota-titolare + un forfait di subentro (resta prob. alta di entrare
+    // comunque), con tetto; panchinaro: parte lui + cameo CONDIZIONATO al non-partire (×0,5).
+    return b.fav
+      ? Math.min(F.favCap ?? 0.90, start + (F.favForfait ?? 0.15))
+      : start + (1 - start) * sub * CAMEO;
+  }
   const pr = p._prob;
-  if (!pr) return 0.15;                                           // non tra i probabili (dato assente)
-  if (pr.status === "titolare") return (pr.perc ?? 70) / 100;     // caso 1 (no cap)
-  return Math.min(CAP, (pr.perc ?? 0) / 100);                     // caso 4 (riserva pura, cappata)
+  if (!pr) return 0.15;                                           // assente dai probabili (dato mancante)
+  if (pr.status === "titolare") {                                 // caso 1: dimezza la penalità di titolarità
+    const fl = F.titFloor ?? 0.5;
+    return fl + (1 - fl) * ((pr.perc ?? 70) / 100);
+  }
+  return Math.min(F.riservaCap ?? 0.50, (pr.perc ?? 0) / 100);    // caso 4: riserva pura, tetto 0,50
 }
 function labelFor(prob, injured) {
   if (injured) return { t: "Panchina", k: "no" };
@@ -1584,15 +1594,17 @@ const FORM_CFG = {
   // venuePeso 1 = pura media per gare; >1 = la sede conta di più (simmetrico: più penalità dove
   // rende meno, più premio dove rende di più). Se 0 gare nella sede → usa l'overall. Tarato con l'utente.
   venuePeso: 1.25,
-  // DISPONIBILITÀ (vista "11 consigliato"): resa = resa_pulita × fattore. Fattore per caso:
-  //  1) titolare no-ball.: %                (lineare, NON cappato)
-  //  2) titolare in ball.: start + subCoppia×cameoRatio   (cappato)
-  //  3) riserva in ball.:  start + subentro×cameoRatio     (cappato)
-  //  4) riserva no-ball.:  subentro                         (cappato)
-  //  5) indisponibile/squalificato/non convocato: 0
-  // cap su 2/3/4 → un ballottaggio non supera mai un titolare quasi-certo (risolve il paradosso).
+  // DISPONIBILITÀ (vista "11 consigliato"): resa = resa_pulita × fattore. Regole per caso:
+  //  - titolare puro:        titFloor + (1−titFloor)×% → dimezza la penalità (es. 80%→0,90)
+  //  - ballottaggio favorito: start + favForfait (tetto favCap) → non punito linearmente
+  //  - ballottaggio panchin.: start + (1−start)×sub×cameoRatio → cameo condizionato al non-partire
+  //  - riserva pura:         min(riservaCap, %) → solo subentro, cappata
+  //  - indisponibile/out:    0
   cameoRatio: 0.5,   // il cameo da subentrante vale metà di una gara intera
-  availCap: 0.85,    // tetto ai casi con calcolo (2/3/4)
+  titFloor: 0.5,     // titolare: pavimento → factor = titFloor + (1−titFloor)×% (metà penalità)
+  favForfait: 0.15,  // ballottaggio-favorito: forfait di subentro sommato allo start
+  favCap: 0.90,      // tetto al favorito di ballottaggio (non supera un titolare quasi-certo)
+  riservaCap: 0.50,  // tetto alla riserva pura (no ballottaggio)
   defMod: {
     includeKeeper: true,
     minDef: 4,

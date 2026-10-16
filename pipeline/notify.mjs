@@ -27,7 +27,6 @@ const g = tryR(`${DATA}/giornata.json`, null);
 const players = tryR(`${DATA}/players.json`, []);
 const qaAsta = tryR(`${DATA}/qa_asta.json`, { qa: {}, fvm: {} });
 const roster = (tryR(`${PIPE}/my_roster_ids.json`, { roster: [] }).roster) || [];
-const indisp = tryR(`${PIPE}/raw/indisponibili.json`, {});   // {team:[{fantaId?,nome,rientro,desc}]} o simile
 const prev = tryR(`${PIPE}/notify_state.json`, { players: {}, xi: [] });
 
 if (!g || !roster.length) { console.log("dati insufficienti, esco"); process.exit(0); }
@@ -35,17 +34,15 @@ if (!g || !roster.length) { console.log("dati insufficienti, esco"); process.exi
 const ROLES = ["P", "D", "C", "A"];
 const pm = {}; players.forEach((p) => (pm[String(p.fantaId)] = p));
 
-// ---- match infortuni per COGNOME + SQUADRA (indisponibili.json ha nome+squadra, non fantaId) ----
-const _deac = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-const surnameOf = (n) => { const t = _deac(n).replace(/[.]/g, "").split(/\s+/).filter(Boolean); return t.length > 1 ? t.slice(0, -1).join(" ") : (t[0] || ""); };
-const injList = Array.isArray(indisp) ? indisp : (indisp && typeof indisp === "object" ? Object.values(indisp).flat() : []);
-const injuryFor = (p) => { const sn = surnameOf(p.nome), sq = _deac(p.squadra); return injList.find((x) => _deac(x.squadra) === sq && surnameOf(x.nome) === sn) || null; };
+// ---- infortuni: UNICA fonte = i flag di players.json (stessa verità dell'app, prodotta da
+// build_players.annota_infortunati unendo infortunati.json + indisponibili.json con match
+// squadra+nome). Niente più rilettura di indisponibili.json né match per solo-cognome. ----
 
 // =================== MOTORE (replica di docs/app.js — allineare a mano) ===================
 const FORM_CFG = {
   goalThresholds: [66, 72, 77, 81, 85, 89, 93, 97, 101],
   defMod: { includeKeeper: true, minDef: 4, bands: [[6, 1], [6.25, 2], [6.5, 3], [6.75, 4.5], [7, 6]] },
-  venuePeso: 1.25, cameoRatio: 0.5, availCap: 0.85,
+  venuePeso: 1.25, cameoRatio: 0.5, titFloor: 0.5, favForfait: 0.15, favCap: 0.90, riservaCap: 0.50,
   factors: {
     enabled: true, clamp: 0.15, formWindow: 3, rampGiornate: 8,
     A: { offOpp: 0.09, offOwn: 0.09, oppStrength: 0.05, form: 0.08 },
@@ -69,16 +66,21 @@ function fmVenue(p, venue) {
   const wS = nS * (FORM_CFG.venuePeso ?? 1.25);
   return (overall * N + fmS * wS) / (N + wS);
 }
-// fattore disponibilità (casi 1-5) per la vista "11 consigliato"
+// fattore disponibilità per la vista "11 consigliato" (allineato a docs/app.js availFactor)
 function availFactor(p) {
-  if (p._injured) return 0;
-  const CAP = FORM_CFG.availCap ?? 0.85, CAMEO = FORM_CFG.cameoRatio ?? 0.5;
+  if (p._injured) return 0;                                       // out/infortunato/squalificato
+  const F = FORM_CFG, CAMEO = F.cameoRatio ?? 0.5;
   const b = g && g.ballottaggi ? g.ballottaggi[String(p.fantaId ?? p.id)] : null;
-  if (b) return Math.min(CAP, (b.start || 0) / 100 + ((b.sub || 0) / 100) * CAMEO);
+  if (b) {
+    const start = (b.start || 0) / 100, sub = (b.sub || 0) / 100;
+    return b.fav
+      ? Math.min(F.favCap ?? 0.90, start + (F.favForfait ?? 0.15))   // favorito: start + forfait
+      : start + (1 - start) * sub * CAMEO;                           // panchinaro: cameo condizionato
+  }
   const pr = p._prob;
-  if (!pr) return 0.15;
-  if (pr.status === "titolare") return (pr.perc ?? 70) / 100;
-  return Math.min(CAP, (pr.perc ?? 0) / 100);
+  if (!pr) return 0.15;                                           // assente dai probabili
+  if (pr.status === "titolare") { const fl = F.titFloor ?? 0.5; return fl + (1 - fl) * ((pr.perc ?? 70) / 100); }
+  return Math.min(F.riservaCap ?? 0.50, (pr.perc ?? 0) / 100);    // riserva pura, tetto 0,50
 }
 function ptsRankMap() {
   if (g._ptsRank) return g._ptsRank;
@@ -163,8 +165,8 @@ roster.forEach((p) => {
   const k = String(p.fantaId);
   p._st = (g.stats || {})[k] || null;
   p._prob = (g.probabili || {})[k] || null;
-  const inj = injuryFor(p);
-  p._injured = !!inj; p._rientro = inj ? (inj.rientro || "") : "";
+  const pl = pm[k] || {};                                    // flag infortunio da players.json (unica fonte)
+  p._injured = !!pl.infortunato; p._rientro = pl.rientro || "";
   p._ctx = teamCtx(p);
   p._match = (g.teamMatch || {})[p.squadra] || null;
   const venue = p._match ? (p._match.home ? "home" : "away") : null;
@@ -199,7 +201,7 @@ for (const p of roster) {
   }
   // infortuni / prognosi
   if (a.injured && !b.injured) eventi.push(`🩹 ${nome(p)} (${p.ruolo}): NUOVO INFORTUNIO${a.rientro ? ` · rientro previsto ${a.rientro}` : " · prognosi non ancora nota"}`);
-  else if (!a.injured && b.injured) eventi.push(`💪 ${nome(p)} (${p.ruolo}): RECUPERATO (non più tra gli indisponibili)`);
+  else if (!a.injured && b.injured) eventi.push(`💪 ${nome(p)} (${p.ruolo}): RECUPERATO (non più infortunato)`);
   else if (a.injured && b.injured && a.rientro !== (b.rientro || "")) eventi.push(`📅 ${nome(p)} (${p.ruolo}): prognosi aggiornata → rientro ${a.rientro || "non definito"}`);
 }
 // cambio 11 consigliato (entra/esce)

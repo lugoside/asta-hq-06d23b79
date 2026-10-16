@@ -640,7 +640,27 @@ def ricalibra_qi_scale(players: list[dict]) -> float:
     return round(scale, 3)
 
 
+def aggiorna_solo_infortuni() -> None:
+    """Modalità LEGGERA (run probabili mid-week): riapplica SOLO i flag infortunio sul
+    players.json ESISTENTE, senza ricostruirlo. NON tocca Qa/FVM/valoreBase/meta/history
+    (restano quelli dell'ultimo run completo: mid-week il listone NON viene riscaricato,
+    quindi un rebuild completo RIPORTEREBBE le quotazioni ai valori base → da evitare).
+    Serve a tenere allineati app e notify sugli infortuni anche a metà settimana."""
+    if not os.path.exists(OUT_PLAYERS):
+        print("players.json assente: salto l'aggiornamento solo-infortuni."); return
+    with open(OUT_PLAYERS, encoding="utf-8") as f:
+        players = json.load(f)
+    for p in players:                      # azzera i flag precedenti (così gestisce i recuperi)
+        p.pop("infortunato", None); p.pop("rientro", None); p.pop("motivoInfortunio", None)
+    n = annota_infortunati(players)
+    with open(OUT_PLAYERS, "w", encoding="utf-8") as f:
+        json.dump(players, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Solo-infortuni: {n} infortunati su {len(players)} giocatori (Qa/FVM/prezzi invariati).")
+
+
 def main():
+    if "--infortuni" in sys.argv:
+        aggiorna_solo_infortuni(); return
     demo = "--demo" in sys.argv
     raw = None if demo else carica_raw()
     is_reale = raw is not None

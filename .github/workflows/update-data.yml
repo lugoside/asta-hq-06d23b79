@@ -212,6 +212,10 @@ jobs:
         run: python pipeline/fetch_giornata.py || echo "probabili non aggiornati (fonte non disponibile), proseguo"
       - name: Indisponibili/infortunati (intercetta nuovi infortuni + prognosi anche mid-week)
         run: python pipeline/fetch_indisponibili.py || echo "indisponibili non aggiornati, proseguo"
+      - name: Infortunati con date (solo fonti extra, NON tocca il listone/quotazioni)
+        run: python pipeline/fetch_sources.py --solo-extra || echo "fonti extra non aggiornate, proseguo"
+      - name: Riapplica i flag infortunio su players.json (unica fonte per app e notify; Qa/FVM invariate)
+        run: python pipeline/build_players.py --infortuni || echo "aggiornamento infortuni non riuscito, proseguo"
       - name: Rinvii/6 politico (tiene fresca la regola posticipi anche in settimana)
         run: python pipeline/fetch_rinvii.py || echo "rinvii non calcolati, proseguo"
       - id: notify
@@ -231,11 +235,13 @@ jobs:
           to: lugoside@gmail.com
           subject: ${{ steps.notify.outputs.subject }}
           body: file://pipeline/notify_body.txt
-      - name: Commit probabili + stato notifiche
+      - name: Commit probabili + infortuni + stato notifiche
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/giornata.json pipeline/notify_state.json
+          # players.json incluso: mid-week ne cambiano SOLO i flag infortunio (Qa/FVM invariate)
+          FILES="docs/data/giornata.json docs/data/players.json pipeline/notify_state.json"
+          git add $FILES
           if git diff --cached --quiet; then
             echo "Nulla da pubblicare."; exit 0
           fi
@@ -245,11 +251,11 @@ jobs:
             # niente rebase (su conflitto restava a metà e bloccava i retry): salvo i miei
             # file, mi riallineo al remoto e li riapplico (fetch_giornata lavora già in MERGE)
             echo "Push rifiutato: riallineo e riapplico (tentativo $i)…"
-            tar -cf /tmp/prob.tar docs/data/giornata.json pipeline/notify_state.json
+            tar -cf /tmp/prob.tar $FILES
             git fetch origin main
             git reset --hard origin/main
             tar -xf /tmp/prob.tar
-            git add docs/data/giornata.json pipeline/notify_state.json
+            git add $FILES
             git diff --cached --quiet && { echo "Nulla da pubblicare dopo il riallineamento."; exit 0; }
             git commit -m "chore: aggiorna probabili/notifiche [skip ci]"
           done
