@@ -153,6 +153,15 @@ def calendar_fixtures():
     return fixtures, team_match
 
 
+def _provvisorio(d):
+    """True se probabili+ballottaggi di `d` sembrano una lista placeholder: almeno 100 titolari,
+    TUTTI al 100%, nessun ballottaggio. Dati vuoti/assenti non sono 'provvisori' (li gestisce
+    l'altra guardia). Uso: la nuova istantanea è provvisoria E quella salvata no → si tiene la vecchia."""
+    pr = d.get("probabili") or {}
+    tit = [v.get("perc") for v in pr.values() if v.get("status") == "titolare"]
+    return len(tit) >= 100 and all(p == 100 for p in tit) and not (d.get("ballottaggi") or {})
+
+
 def main():
     teams = team_map()
     stats = parse_stats()
@@ -186,6 +195,16 @@ def main():
     if not prob.get("probabili") and data.get("probabili") and prob.get("fixtures"):
         print("  ATTENZIONE: 0 probabili ma ci sono partite: tengo i probabili precedenti")
         prob = {k: v for k, v in prob.items() if k not in ("probabili", "commento", "ballottaggi")}
+    # ISTANTANEA PROVVISORIA: tra un turno e l'altro la fonte può mostrare per ore una lista
+    # placeholder (tutti i titolari al 100%, zero ballottaggi) prima dei probabili veri. Se i
+    # dati già salvati sono "veri" (percentuali varie o ballottaggi) NON sovrascriverli: sulla
+    # lista provvisoria ogni titolare vale 1,0 e l'11 consigliato perde significato.
+    # FORZA_PROBABILI=1 salta il controllo (es. formazioni ufficiali di tutte le gare).
+    if prob.get("probabili") and not os.environ.get("FORZA_PROBABILI"):
+        if _provvisorio(prob) and not _provvisorio(data):
+            print("  ATTENZIONE: probabili PROVVISORI (tutti i titolari al 100%, 0 ballottaggi): "
+                  "tengo i probabili precedenti")
+            prob = {k: v for k, v in prob.items() if k not in ("probabili", "commento", "ballottaggi")}
     for k in ("probabili", "teamMatch", "fixtures", "commento", "ballottaggi"):
         if k in prob:
             data[k] = prob[k]
