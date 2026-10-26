@@ -1,39 +1,39 @@
 {
-  "aggiornato": "2026-10-23T11:59:41+00:00",
-  "fonteAggiornata": "23/10/2026",
+  "aggiornato": "2026-10-26T01:46:22+00:00",
+  "fonteAggiornata": "25/10/2026",
   "sources": {
     "Listone": {
-      "fp": "85510922bea4",
-      "lastChanged": "2026-10-20T14:29:57+00:00"
+      "fp": "0eadc79b7879",
+      "lastChanged": "2026-10-26T01:46:22+00:00"
     },
     "Infortuni": {
-      "fp": "7cf375623f21",
-      "lastChanged": "2026-10-23T11:59:41+00:00"
+      "fp": "1b4d30886007",
+      "lastChanged": "2026-10-26T01:46:22+00:00"
     },
     "Formazioni": {
       "fp": "a310307606ee",
       "lastChanged": "2026-09-29T13:15:37+00:00"
     },
     "Rigori/Punizioni": {
-      "fp": "b5eb412794c0",
-      "lastChanged": "2026-10-16T07:59:29+00:00"
+      "fp": "4be83e5a6e66",
+      "lastChanged": "2026-10-26T01:46:22+00:00"
     },
     "Corner": {
-      "fp": "6e33ec80bab3",
-      "lastChanged": "2026-10-23T11:59:41+00:00"
+      "fp": "e40d6571dd11",
+      "lastChanged": "2026-10-26T01:46:22+00:00"
     }
   },
   "fonte": "fantacalcio.it — lista ufficiale 2026/27 (QUOT./FVM); nomi/rating da fantacalcio-online",
   "isDemo": false,
   "numGiocatori": 546,
-  "numInfortunati": 78,
+  "numInfortunati": 92,
   "numFormazioni": 341,
   "consensoFormazioni": {
     "tit": 253,
     "ball": 88,
     "ris": 205
   },
-  "numRigoristi": 78,
+  "numRigoristi": 77,
   "numPunizioni": 70,
   "numCorner": 68,
   "numGoalTiers": 173,
