@@ -13,7 +13,7 @@ import urllib.request, re, json, os, html as ihtml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GIORNATA = os.path.join(HERE, "..", "docs", "data", "giornata.json")
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 URL = "https://www.fantacalcio.it/serie-a/classifica"
 
 CELLS = {  # classe cella -> chiave

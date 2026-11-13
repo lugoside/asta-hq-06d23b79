@@ -30,7 +30,7 @@ def clean_url(raw):
 HERE = os.path.dirname(os.path.abspath(__file__))
 GIORNATA = os.path.join(HERE, "..", "docs", "data", "giornata.json")
 ROSTER = os.path.join(HERE, "my_roster_ids.json")
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 STATS_URL = "https://www.fantacalcio.it/statistiche-serie-a"
 
 

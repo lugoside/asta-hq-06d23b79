@@ -22,7 +22,7 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))
 GIORNATA = os.path.join(HERE, "..", "docs", "data", "giornata.json")
 CACHE = os.path.join(HERE, "matches_cache.json")
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 BASE = "https://www.fantacalcio.it/serie-a/calendario"
 try:
     from zoneinfo import ZoneInfo

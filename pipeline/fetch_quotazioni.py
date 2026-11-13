@@ -17,6 +17,7 @@ Uso:  python fetch_quotazioni.py [stagione]   (default 2026/27)
 Output: pipeline/raw/quotazioni_fanta.json
 """
 import urllib.request, re, json, os, sys, html as ihtml
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +27,7 @@ ROLE = {"p": "P", "d": "D", "c": "C", "a": "A"}
 
 
 def fetch_html(url: str) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     return urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "ignore")
 
 

@@ -19,7 +19,7 @@ from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "docs", "data", "giornata.json")
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 STATS_URL = "https://www.fantacalcio.it/statistiche-serie-a"
 PROB_URL = "https://www.fantacalcio.it/probabili-formazioni-serie-a"
 QUOT_URL = "https://www.fantacalcio.it/quotazioni-fantacalcio"

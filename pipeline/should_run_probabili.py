@@ -17,7 +17,7 @@ Uso locale:  python should_run_probabili.py
 """
 import urllib.request, re, os, datetime
 
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 BASE = "https://www.fantacalcio.it/serie-a/calendario"
 try:
     from zoneinfo import ZoneInfo

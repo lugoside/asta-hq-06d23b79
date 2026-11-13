@@ -19,6 +19,7 @@ della pagina non rovina i dati.
 Uso:  python fetch_probabili.py [url]
 """
 import urllib.request, re, json, os, sys, html as ihtml
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "formazioni_fanta.json")
@@ -34,7 +35,7 @@ TEAMS = ["ATALANTA", "BOLOGNA", "CAGLIARI", "COMO", "FIORENTINA", "FROSINONE",
 
 
 def fetch_html(url: str) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
     return urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "ignore")
 
 

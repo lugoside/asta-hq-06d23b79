@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GIORNATA = os.path.join(HERE, "..", "docs", "data", "giornata.json")
 ROSTER = os.path.join(HERE, "my_roster_ids.json")
 CACHE = os.path.join(HERE, "matches_cache.json")
-UA = "Mozilla/5.0"
+from http_ua import UA  # User-Agent unico (vedi http_ua.py)
 CAL = "https://www.fantacalcio.it/serie-a/calendario/{}"
 
 
